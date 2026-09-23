@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flag, icon with context %}
+{% block title %}Oversikt{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Oversikt</h1>
+    <p>Slik går det med golfsalget.</p>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn" href="{{ url_for('main.prissjekk') }}">{{ icon('scale', 16) }}Sjekk en pris</a>
+    <a class="btn btn--primary" href="{{ url_for('main.lager_ny') }}">{{ icon('plus', 16) }}Legg til ting</a>
+  </div>
+</div>
+
+{% if d.budget_state == 'over' %}
+  <div class="banner banner--stop" role="alert">
+    {{ icon('alert', 20) }}
+    <div>
+      <p><strong>Du er over budsjettet.</strong></p>
+      <p>Du har {{ d.bound|kr }} bundet i lager. Budsjettet ditt er {{ d.budget|kr }}, så du er {{ (d.bound - d.budget)|kr }} over. Selg noe før du kjøper mer.</p>
+    </div>
+  </div>
+{% elif d.budget_state == 'near' %}
+  <div class="banner banner--maybe">
+    {{ icon('alert', 20) }}
+    <div><p><strong>Nær budsjettgrensen.</strong> Du har {{ d.bound|kr }} av {{ d.budget|kr }} bundet i lager.</p></div>
+  </div>
+{% endif %}
+
+<section class="hero">
+  <div class="card hero__main">
+    <div>
+      <div class="hero__label">Total fortjeneste</div>
+      <div class="hero__value{% if d.profit < 0 %} neg{% endif %}">{{ d.profit|kr }}</div>
+      <div class="hero__sub">
+        {% if d.sold_count %}
+          Fra {{ d.sold_count }} {{ 'solgt ting' if d.sold_count == 1 else 'solgte ting' }}{% if d.margin is not none %}, i snitt {{ d.margin|prosent }} på det du har lagt ut{% endif %}.
+        {% else %}
+          Ingen salg ennå. Når du markerer en ting som solgt, dukker fortjenesten opp her.
+        {% endif %}
+      </div>
+    </div>
+    <a class="finds-callout{% if d.new_finds %} finds-callout--has{% endif %}" href="{{ url_for('main.funn') }}">
+      <span class="finds-callout__num">{{ d.new_finds }}</span>
+      <span class="finds-callout__text">
+        <strong>{{ 'nytt funn' if d.new_finds == 1 else 'nye funn' }} siden sist</strong>
+        <span>{{ d.open_finds }} {{ 'annonse venter' if d.open_finds == 1 else 'annonser venter' }} på at du tar stilling</span>
+      </span>
+      <span aria-hidden="true">→</span>
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="hero__label">Penger bundet i lager nå</div>
+    <div class="hero__value" style="font-size:40px">{{ d.bound|kr }}</div>
+    <div class="hero__sub">{{ d.stock_count }} {{ 'ting' }} på lager (kjøpt, klargjøres eller til salgs)</div>
+    {% if d.budget %}
+      {% set pct = d.budget_pct or 0 %}
+      <div class="meter meter--{{ d.budget_state }}" role="img" aria-label="{{ pct|round|int }} prosent av budsjettet er brukt">
+        <div class="meter__track"><div class="meter__fill" style="width: {{ [pct, 100]|min }}%"></div></div>
+        <div class="meter__legend">
+          <span class="meter__state">
+            {% if d.budget_state == 'over' %}{{ icon('alert', 14) }}Over budsjett
+            {% elif d.budget_state == 'near' %}{{ icon('alert', 14) }}Nær grensen
+            {% else %}{{ icon('check', 14) }}Innenfor budsjett{% endif %}
+          </span>
+          <span class="num">{{ pct|prosent }} av {{ d.budget|kr }}</span>
+        </div>
+      </div>
+    {% else %}
+      <p class="hint" style="margin-top:12px">Du har ikke satt noe budsjett. <a href="{{ url_for('main.innstillinger') }}#budsjett">Sett et budsjett</a></p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="tiles" aria-label="Nøkkeltall">
+  <div class="tile">
+    <div class="tile__label">Totalt investert</div>
+    <div class="tile__value">{{ d.invested|kr }}</div>
+    <div class="tile__sub">Alt du har kjøpt, med kostnader</div>
+  </div>
+  <div class="tile">
+    <div class="tile__label">Total omsetning</div>
+    <div class="tile__value">{{ d.revenue|kr }}</div>
+    <div class="tile__sub">Summen av alle salg</div>
+  </div>
+  <div class="tile">
+    <div class="tile__label">Snitt fortjeneste per ting</div>
+    <div class="tile__value">{{ d.avg_profit|kr if d.avg_profit is not none else '–' }}</div>
+    <div class="tile__sub">Per solgte ting</div>
+  </div>
+  <div class="tile">
+    <div class="tile__label">Snitt dager til salg</div>
+    <div class="tile__value">{% if d.avg_days is not none %}{{ d.avg_days|tall }} dager{% else %}–{% endif %}</div>
+    <div class="tile__sub">Fra kjøp til solgt</div>
+  </div>
+</section>
+
+<section class="two-col" style="margin-bottom:18px">
+  <div class="card">
+    <div class="card__head">
+      <h2>Fortjeneste per måned</h2>
+      <p>Siste 12 måneder, etter salgsdato</p>
+    </div>
+    {% set m = d.months %}
+    {% if m.has_data %}
+      <div class="colchart" role="img" aria-label="Søylediagram over fortjeneste per måned">
+        <div class="colchart__axis" aria-hidden="true">
+          {% for t in m.ticks %}<span style="top: {{ t.pos }}%">{{ t.value|tall }}</span>{% endfor %}
+        </div>
+        <div class="colchart__plot">
+          {% for t in m.ticks %}<div class="colchart__grid" style="top: {{ t.pos }}%"></div>{% endfor %}
+          <div class="colchart__zero" style="top: {{ m.zero_pos }}%"></div>
+          {% for b in m.bars %}
+            <div class="col" tabindex="0"
+                 data-tip-value="{{ b.value|kr(signed=True) }}"
+                 data-tip-label="{{ b.full_label }} · {{ b.count }} {{ 'salg' }}">
+              {% if b.value >= 0 %}
+                <span class="bar bar--pos" style="bottom: {{ 100 - m.zero_pos }}%; height: {{ b.height }}%"></span>
+              {% else %}
+                <span class="bar bar--neg" style="top: {{ m.zero_pos }}%; height: {{ b.height }}%"></span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="colchart__labels" aria-hidden="true">
+          {% for b in m.bars %}<span class="{{ 'year' if b.first_of_year }}">{{ b.label }}</span>{% endfor %}
+        </div>
+      </div>
+      <details class="table-view">
+        <summary>Vis som tabell</summary>
+        <table>
+          <thead><tr><th>Måned</th><th class="num">Salg</th><th class="num">Fortjeneste</th></tr></thead>
+          <tbody>
+            {% for b in m.bars %}<tr><td>{{ b.full_label }}</td><td class="num">{{ b.count }}</td><td class="num">{{ b.value|kr }}</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </details>
+    {% else %}
+      <div class="empty-inline">Ingen salg de siste 12 månedene ennå.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card__head">
+      <h2>Fordeling per type</h2>
+      <div class="legend">
+        <span><i class="swatch swatch--1"></i>Solgt</span>
+        <span><i class="swatch swatch--2"></i>På lager</span>
+      </div>
+    </div>
+    {% if d.type_rows %}
+      <div class="hbars">
+        {% for r in d.type_rows %}
+          <div class="hbar">
+            <span class="hbar__label">{{ r.label }}</span>
+            <span class="hbar__track">
+              {% if r.sold %}<span class="hbar__seg hbar__seg--1" style="width: {{ r.sold_w }}%" tabindex="0"
+                    data-tip-value="{{ r.sold }} solgt" data-tip-label="{{ r.label }}"></span>{% endif %}
+              {% if r.stock %}<span class="hbar__seg hbar__seg--2" style="width: {{ r.stock_w }}%" tabindex="0"
+                    data-tip-value="{{ r.stock }} på lager" data-tip-label="{{ r.label }}"></span>{% endif %}
+            </span>
+            <span class="hbar__value">{{ r.total }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      <details class="table-view">
+        <summary>Vis som tabell</summary>
+        <table>
+          <thead><tr><th>Type</th><th class="num">Solgt</th><th class="num">På lager</th></tr></thead>
+          <tbody>{% for r in d.type_rows %}<tr><td>{{ r.label }}</td><td class="num">{{ r.sold }}</td><td class="num">{{ r.stock }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </details>
+    {% else %}
+      <div class="empty-inline">Lageret er tomt. <a href="{{ url_for('main.lager_ny') }}">Legg til den første tingen</a></div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="split" style="margin-bottom:18px">
+  {% for title, rows in [('Typer som gir mest fortjeneste', d.top_types), ('Merker som gir mest fortjeneste', d.top_brands)] %}
+    <div class="card">
+      <div class="card__head"><h2>{{ title }}</h2><p>Solgte ting</p></div>
+      {% if rows %}
+        <ol class="rank">
+          {% for r in rows %}
+            <li>
+              <span class="rank__name">{{ r.name }}</span>
+              <span class="rank__value{% if r.profit < 0 %} neg{% endif %}">{{ r.profit|kr }}</span>
+              <span class="rank__track"><span class="rank__fill{% if r.profit < 0 %} neg{% endif %}" style="width: {{ r.width }}%; display:block"></span></span>
+              <span class="rank__meta">{{ r.count }} solgt · snitt {{ r.avg|kr }} per ting</span>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <div class="empty-inline">Kommer når du har solgt noe.</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</section>
+
+{% if best %}
+<section class="card">
+  <div class="card__head">
+    <h2>Kjøp-kandidater blant nye funn</h2>
+    <a href="{{ url_for('main.funn', farge='gronn') }}">Se alle →</a>
+  </div>
+  <ol class="rank">
+    {% for b in best %}
+      <li>
+        <span class="rank__name"><a href="{{ url_for('main.prissjekk', funn=b.listing.id) }}">{{ b.listing.title }}</a></span>
+        <span class="rank__value">{{ b.listing.price|kr }}</span>
+        <span class="rank__meta">{{ flag('gronn') }} Forventet fortjeneste <strong class="pos">{{ b.check.profit|kr(signed=True) }}</strong> · {{ b.listing.location or 'Ukjent sted' }} · funnet {{ b.listing.first_seen_at|tid_siden }}</span>
+      </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}
+{% endblock %}

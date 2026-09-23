@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flag, icon, kr_field with context %}
+{% block title %}Prissjekk{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Prissjekk</h1>
+    <p>Lønner det seg å kjøpe? Sammenligner først med dine egne salg, og med markedsprisene på Finn hvis du ikke har solgt noe lignende. Regelen din: {{ rule_text }}.</p>
+  </div>
+</div>
+
+<div class="form-layout" style="grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr)">
+  <form method="get" class="card" action="{{ url_for('main.prissjekk') }}">
+    {% if listing %}
+      <div class="basis" style="margin-bottom:16px">
+        Sjekker annonsen <a href="{{ listing.url }}" target="_blank" rel="noopener noreferrer">«{{ listing.title }}»</a>{% if listing.location %} i {{ listing.location }}{% endif %}.
+      </div>
+      <input type="hidden" name="funn" value="{{ listing.id }}">
+    {% endif %}
+    <div class="grid-2">
+      <div class="field">
+        <label for="merke">Merke</label>
+        <input type="text" id="merke" name="merke" value="{{ form.brand }}" list="merker" autocomplete="off" placeholder="F.eks. Scotty Cameron" required>
+      </div>
+      <div class="field">
+        <label for="modell">Modell</label>
+        <input type="text" id="modell" name="modell" value="{{ form.model }}" list="modeller" autocomplete="off" placeholder="F.eks. Newport 2">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <label for="type">Type</label>
+        <select id="type" name="type">
+          {% for key, label in TYPES %}<option value="{{ key }}" {% if form.type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="tilstand">Tilstand</label>
+        <select id="tilstand" name="tilstand">
+          {% for value, label in CONDITIONS %}<option value="{{ value }}" {% if form.condition == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      {{ kr_field('pris', 'Pris i annonsen', form.price, required=True) }}
+      {{ kr_field('ekstra', 'Ekstra kostnader', form.extras, hint='La stå tom for å bruke et anslag') }}
+    </div>
+    <button class="btn btn--primary" type="submit">{{ icon('scale', 16) }}Sjekk prisen</button>
+  </form>
+
+  <div>
+    {% if result %}
+      {% set r = result %}
+      <section class="verdict verdict--{{ r.color }}" aria-live="polite">
+        {{ flag(r.color, r.label) }}
+        <div class="verdict__decision">{{ r.decision }}</div>
+        <p class="verdict__reason">{{ r.reason }}</p>
+        {% if r.expected_sale is not none %}
+          <dl class="verdict__grid">
+            <div><dt>Forventet salgspris</dt><dd>{{ r.expected_sale|kr }}</dd></div>
+            <div><dt>Ekstra kostnader{% if form.extras is none %} (anslått){% endif %}</dt><dd>{{ r.extra_costs|kr }}</dd></div>
+            {% if r.profit is not none %}
+              <div><dt>Forventet fortjeneste</dt><dd class="{{ 'pos' if r.profit > 0 else 'neg' }}">{{ r.profit|kr(signed=True) }}</dd></div>
+              <div><dt>Fortjeneste i prosent</dt><dd class="{{ 'pos' if r.profit > 0 else 'neg' }}">{{ r.profit_pct|prosent(signed=True) }}</dd></div>
+              <div><dt>Kostnad totalt</dt><dd>{{ r.total_cost|kr }}</dd></div>
+              <div><dt>Høyeste pris som oppfyller regelen</dt><dd>{{ r.max_price|kr if r.max_price else 'Ingen' }}</dd></div>
+            {% endif %}
+          </dl>
+          <p class="basis">{{ r.basis }}{% if r.source == 'marked' %} Husk at dette er utlagte priser, ikke salgspriser.{% endif %}</p>
+        {% endif %}
+        {% for note in r.notes %}
+          <div class="banner banner--maybe" style="margin:14px 0 0">{{ icon('alert', 18) }}<p>{{ note }}</p></div>
+        {% endfor %}
+      </section>
+
+      {% if r.comparables %}
+        <section class="card" style="margin-top:18px">
+          <div class="card__head">
+            <h2>{{ 'Dine salg' if r.source == 'salg' else 'Annonser på Finn' }} som er brukt</h2>
+            <p>{{ r.comparables|length }} stk</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>{{ 'Ting' if r.source == 'salg' else 'Annonse' }}</th>
+                <th>Dato</th>
+                <th class="num">{{ 'Solgt for' if r.source == 'salg' else 'Utlagt pris' }}</th>
+                <th class="num">Justert</th>
+              </tr></thead>
+              <tbody>
+                {% for c in r.comparables[:15] %}
+                  <tr>
+                    <td>{% if c.url %}<a href="{{ c.url }}" target="_blank" rel="noopener noreferrer">{{ c.label }}</a>{% else %}{{ c.label }}{% endif %}
+                      {% if c.condition %}<span class="muted small"> · tilstand {{ c.condition }}/5</span>{% endif %}</td>
+                    <td class="num">{{ c.date|dato(short=True) if c.date else '–' }}</td>
+                    <td class="num">{{ c.price|kr }}</td>
+                    <td class="num">{{ c.adjusted|kr }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="hint" style="margin-top:10px">
+            {% if r.source == 'salg' %}«Justert» tar hensyn til forskjell i tilstand ({{ settings.condition_step_pct|tall }} % per nivå).
+            {% else %}«Justert» er utlagt pris × {{ settings.sale_factor_pct|tall }} %, justert for tilstanden du valgte.{% endif %}
+            Forventet salgspris er midtverdien (medianen).
+          </p>
+        </section>
+      {% endif %}
+    {% else %}
+      <div class="card empty">
+        <h3>Fyll inn en annonse</h3>
+        <p>Skriv inn merke, modell, type, tilstand og pris, så får du forventet salgspris, fortjeneste og et klart svar: Kjøp eller La være.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+<datalist id="merker">{% for b in brands %}<option value="{{ b }}">{% endfor %}</datalist>
+<datalist id="modeller">{% for m in models %}<option value="{{ m }}">{% endfor %}</datalist>
+{% endblock %}

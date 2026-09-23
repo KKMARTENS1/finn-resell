@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon with context %}
+{% block title %}Finn-søk{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Finn-søk</h1>
+    <p>Lim inn lenker til søk på Finn. Scraperen sjekker dem jevnlig og legger nye annonser under Nye funn.</p>
+  </div>
+</div>
+
+<section class="card" style="margin-bottom:18px" data-scraper-status data-running="{{ 1 if scraper_running else 0 }}">
+  <div class="scraper-state">
+    {% if settings.scraper_error %}
+      <div class="scraper-state__big"><span class="dot dot--stop"></span>Stoppet</div>
+    {% elif scraper_running %}
+      <div class="scraper-state__big"><span class="dot dot--busy"></span>Sjekker nå …</div>
+    {% elif settings.scraper_enabled %}
+      <div class="scraper-state__big"><span class="dot dot--on"></span>Scraperen er på</div>
+    {% else %}
+      <div class="scraper-state__big"><span class="dot"></span>Scraperen er av</div>
+    {% endif %}
+    <div class="scraper-state__actions">
+      {% if settings.scraper_enabled %}
+        <form class="inline" method="post" action="{{ url_for('main.scraper_sjekk') }}">
+          <button class="btn" type="submit" {% if scraper_running or not searches %}disabled{% endif %}>{{ icon('refresh', 16) }}Sjekk nå</button>
+        </form>
+        <form class="inline" method="post" action="{{ url_for('main.scraper_av') }}">
+          <button class="btn" type="submit">{{ icon('power', 16) }}Slå av</button>
+        </form>
+      {% else %}
+        <form class="inline" method="post" action="{{ url_for('main.scraper_pa') }}">
+          <button class="btn btn--primary" type="submit">{{ icon('power', 16) }}{{ 'Slå på igjen' if settings.scraper_error else 'Slå på' }}</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if settings.scraper_error %}
+    <div class="banner banner--stop" role="alert" style="margin:16px 0 0">
+      {{ icon('alert', 20) }}
+      <div>
+        <p><strong>Scraperen har stoppet.</strong> {{ settings.scraper_error }}</p>
+        <p>Den slår seg ikke på av seg selv. Når du har lest meldingen, kan du trykke «Slå på igjen». Stopper den igjen med samme melding, bør du la den være av en stund.</p>
+      </div>
+    </div>
+  {% elif settings.scraper_notice %}
+    <div class="banner banner--maybe" style="margin:16px 0 0">{{ icon('alert', 20) }}<p>{{ settings.scraper_notice }}</p></div>
+  {% endif %}
+
+  <div class="meta-row">
+    <span>Sist sjekket: <strong>{{ settings.scraper_last_run|tid_siden if settings.scraper_last_run else 'aldri' }}</strong></span>
+    {% if settings.scraper_enabled and settings.scraper_next_run %}
+      <span>Neste sjekk: <strong>{{ settings.scraper_next_run|tid_siden }}</strong></span>
+    {% endif %}
+    <span>Sjekker hvert <strong>{{ settings.scrape_interval_min }}. minutt</strong> · <a href="{{ url_for('main.innstillinger') }}#scraper">endre</a></span>
+  </div>
+  <ul class="rules">
+    <li>{{ icon('check', 14) }}Logger aldri inn på Finn</li>
+    <li>{{ icon('check', 14) }}Henter bare søkeresultatsidene, ikke hver annonse</li>
+    <li>{{ icon('check', 14) }}Venter {{ settings.page_delay_s }}–{{ settings.page_delay_s + 4 }} sekunder mellom hver side</li>
+    <li>{{ icon('check', 14) }}Stopper og sier fra hvis Finn blokkerer eller svarer med feil</li>
+  </ul>
+  <p class="hint" style="margin-top:12px">Scraperen går bare mens Golflager er åpen på Macen.</p>
+</section>
+
+<section class="two-col" style="grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr)">
+  <div class="card">
+    <div class="card__head"><h2>Søkene dine</h2><p>{{ searches|length }} stk</p></div>
+    {% if searches %}
+      <div>
+        {% for s in searches %}
+          <div class="search-row{% if not s.active %} paused{% endif %}">
+            <div style="min-width:0">
+              <div class="search-row__name">{{ s.name }}{% if not s.active %}<span class="chip">Pauset</span>{% endif %}</div>
+              <a class="search-row__url" href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.url }}</a>
+              <div class="search-row__stats">
+                <span>Sjekket {{ s.last_checked_at|tid_siden if s.last_checked_at else 'ikke ennå' }}</span>
+                {% if s.last_count is not none %}<span>{{ s.last_count }} treff sist · {{ s.last_new or 0 }} nye</span>{% endif %}
+                <span>{{ s.total }} annonser totalt</span>
+                {% if s.default_brand or s.default_type %}
+                  <span>Standard: {{ s.default_brand or '–' }}{% if s.default_type %} · {{ TYPE_LABELS[s.default_type] }}{% endif %}</span>
+                {% endif %}
+              </div>
+              {% if s.last_note %}<div class="search-row__note">{{ s.last_note }}</div>{% endif %}
+              <details>
+                <summary>Endre</summary>
+                <form method="post" action="{{ url_for('main.sok_endre', search_id=s.id) }}" style="margin-top:10px">
+                  <div class="field"><label for="n{{ s.id }}">Navn</label><input type="text" id="n{{ s.id }}" name="name" value="{{ s.name }}" required></div>
+                  <div class="grid-2">
+                    <div class="field"><label for="db{{ s.id }}">Standard merke</label><input type="text" id="db{{ s.id }}" name="default_brand" value="{{ s.default_brand }}"></div>
+                    <div class="field"><label for="dt{{ s.id }}">Standard type</label>
+                      <select id="dt{{ s.id }}" name="default_type">
+                        <option value="">Gjett fra tittelen</option>
+                        {% for key, label in TYPES %}<option value="{{ key }}" {% if s.default_type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                  <button class="btn btn--small" type="submit">Lagre</button>
+                </form>
+              </details>
+            </div>
+            <div class="search-row__actions">
+              <a class="btn btn--small btn--ghost" href="{{ url_for('main.funn', sok=s.id) }}">Se funn</a>
+              <form class="inline" method="post" action="{{ url_for('main.sok_aktiv', search_id=s.id) }}">
+                <button class="btn btn--small" type="submit">{{ 'Pause' if s.active else 'Start' }}</button>
+              </form>
+              <form class="inline" method="post" action="{{ url_for('main.sok_slett', search_id=s.id) }}"
+                    data-confirm="Slette søket «{{ s.name }}»? Annonsene det har funnet, blir liggende.">
+                <button class="btn btn--small btn--danger" type="submit">Slett</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <h3>Ingen søk ennå</h3>
+        <p>Legg inn ditt første søk i skjemaet. For eksempel «Scotty Cameron» med makspris 3000 kr.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="stack">
+    <form class="card" method="post" action="{{ url_for('main.sok_ny') }}">
+      <h2 style="margin-bottom:6px">Legg til et søk</h2>
+      <p class="small muted" style="margin-bottom:14px">Gjør søket på finn.no med ord, kategori og makspris. Kopier lenken fra adressefeltet og lim den inn her.</p>
+      <div class="field">
+        <label for="url">Lenke til søket</label>
+        <input type="url" id="url" name="url" required placeholder="https://www.finn.no/recommerce/forsale/search?q=scotty+cameron&price_to=3000">
+      </div>
+      <div class="field">
+        <label for="name">Navn <span class="muted">(valgfritt)</span></label>
+        <input type="text" id="name" name="name" placeholder="F.eks. Scotty Cameron under 3000">
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="default_brand">Standard merke</label>
+          <input type="text" id="default_brand" name="default_brand" placeholder="Valgfritt">
+        </div>
+        <div class="field">
+          <label for="default_type">Standard type</label>
+          <select id="default_type" name="default_type">
+            <option value="">Gjett fra tittelen</option>
+            {% for key, label in TYPES %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <p class="hint" style="margin:-4px 0 14px">Standardverdiene brukes når tittelen i annonsen ikke sier hvilket merke eller hvilken type det er.</p>
+      <button class="btn btn--primary" type="submit">{{ icon('plus', 16) }}Legg til søk</button>
+    </form>
+
+    <div class="card">
+      <h2 style="margin-bottom:10px">Siste hendelser</h2>
+      {% if events %}
+        <ul class="log">
+          {% for e in events %}
+            <li><time datetime="{{ e.at }}">{{ e.at|tid_siden }}</time><span class="{{ e.level }}">{{ e.message }}</span></li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted small">Ingenting har skjedd ennå.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

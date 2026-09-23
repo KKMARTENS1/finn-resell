@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon with context %}
+{% block title %}Markedspriser{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Markedspriser</h1>
+    <p>Hva ting pleier å koste på Finn, basert på alle annonsene scraperen har sett.</p>
+  </div>
+</div>
+
+<div class="banner banner--maybe">
+  {{ icon('info', 20) }}
+  <div>
+    <p><strong>Dette er utlagte priser, ikke salgspriser.</strong></p>
+    <p>Tallene viser hva selgere ber om på Finn. Ting selges ofte for mindre, så prissjekken regner med {{ settings.sale_factor_pct|tall }} % av utlagt pris. Dine egne salg står i en egen kolonne.</p>
+  </div>
+</div>
+
+<form method="get" class="filters">
+  <nav class="seg" aria-label="Vis per">
+    {% for key, label in [('modell', 'Modell'), ('merke', 'Merke'), ('type', 'Type')] %}
+      <a href="{{ url_for('main.markedspriser', gruppe=key, type=type_key or None, periode=months, q=q or None) }}" {% if group == key %}aria-current="true"{% endif %}>Per {{ label|lower }}</a>
+    {% endfor %}
+  </nav>
+  <input type="hidden" name="gruppe" value="{{ group }}">
+  <label class="visually-hidden" for="type">Type</label>
+  <select id="type" name="type" data-autosubmit>
+    <option value="">Alle typer</option>
+    {% for key, label in TYPES %}<option value="{{ key }}" {% if type_key == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <label class="visually-hidden" for="periode">Periode</label>
+  <select id="periode" name="periode" data-autosubmit>
+    {% for value, label in [(3, 'Siste 3 måneder'), (12, 'Siste 12 måneder'), (0, 'Hele perioden')] %}
+      <option value="{{ value }}" {% if months == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <label class="visually-hidden" for="q">Søk</label>
+  <input type="search" id="q" name="q" value="{{ q }}" placeholder="Søk etter merke eller modell">
+</form>
+
+<div class="card">
+  {% if table %}
+    <div class="card__head">
+      <h2>{{ table|length }} {{ 'gruppe' if table|length == 1 else 'grupper' }}</h2>
+      <p>{{ total }} annonsepriser</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:240px">{{ 'Type' if group == 'type' else 'Ting' }}</th>
+            <th class="num">Annonser</th>
+            <th class="num">Typisk utlagt pris</th>
+            <th class="num">Vanlig spenn</th>
+            <th class="num">Lavest – høyest</th>
+            <th class="num">Dine salg</th>
+            <th>Sist sett</th>
+            <th><span class="visually-hidden">Prissjekk</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in table %}
+            <tr>
+              <td>
+                {% if group == 'type' %}<div class="item-name">{{ TYPE_LABELS.get(r.type, 'Annet') }}</div>
+                {% else %}
+                  <div class="item-name">{{ r.brand }}{% if group == 'modell' %} <span style="font-weight:500">{{ r.model or '(uten modell)' }}</span>{% endif %}</div>
+                  <div class="item-sub">{{ TYPE_LABELS.get(r.type, 'Annet') }}</div>
+                {% endif %}
+              </td>
+              <td class="num">{{ r.count }}</td>
+              <td class="num"><strong>{{ r.median|kr }}</strong></td>
+              <td class="num">{{ r.low|tall }}–{{ r.high|kr }}</td>
+              <td class="num muted">{{ r.min|tall }}–{{ r.max|kr }}</td>
+              <td class="num">{% if r.own is not none %}{{ r.own|kr }} <span class="muted small">({{ r.own_count }})</span>{% else %}<span class="muted">–</span>{% endif %}</td>
+              <td class="muted small">{{ r.last_seen|dato(short=True) }}</td>
+              <td class="actions">
+                {% if group != 'type' %}<a class="btn btn--small btn--ghost" href="{{ url_for('main.prissjekk', merke=r.brand, modell=r.model if group == 'modell' else None, type=r.type) }}">Prissjekk</a>{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin-top:12px">«Typisk» er midtverdien (medianen). «Vanlig spenn» er der halvparten av annonsene ligger. «Dine salg» er midtverdien av det du selv har solgt for, med antall i parentes.</p>
+  {% else %}
+    <div class="empty">
+      <h3>Ingen priser ennå</h3>
+      <p>Når scraperen har funnet annonser, ser du her hva ting pleier å koste. Legg inn noen Finn-søk for å komme i gang.</p>
+      <a class="btn btn--primary" href="{{ url_for('main.sok') }}">Gå til Finn-søk</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

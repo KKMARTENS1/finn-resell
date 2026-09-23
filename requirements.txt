@@ -1,0 +1,4 @@
+flask>=2.3,<4
+requests>=2.31,<3
+urllib3>=1.26,<2
+beautifulsoup4>=4.12,<5

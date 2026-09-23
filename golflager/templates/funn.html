@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flag, icon with context %}
+{% block title %}Nye funn{% endblock %}
+{% block content %}
+{% set here = request.full_path %}
+<div class="page-head">
+  <div>
+    <h1>Nye funn</h1>
+    <p>Annonser fra Finn-søkene dine, nyeste først. Hver annonse er sjekket mot regelen din: {{ rule_text }}.</p>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn" href="{{ url_for('main.sok') }}">{{ icon('radar', 16) }}Finn-søk</a>
+  </div>
+</div>
+
+<div class="filters">
+  <nav class="seg" aria-label="Vis">
+    {% for key, label in [('ny', 'Nye'), ('skjult', 'Skjulte'), ('kjopt', 'Kjøpt')] %}
+      <a href="{{ url_for('main.funn', vis=key, sok=search_filter) }}" {% if view == key %}aria-current="true"{% endif %}>{{ label }} <span class="count">{{ tab_counts[key] }}</span></a>
+    {% endfor %}
+  </nav>
+  <nav class="seg" aria-label="Prissjekk">
+    <a href="{{ url_for('main.funn', vis=view, sok=search_filter) }}" {% if not color %}aria-current="true"{% endif %}>Alle</a>
+    {% for key in ['gronn', 'gul', 'rod'] %}
+      <a href="{{ url_for('main.funn', vis=view, farge=key, sok=search_filter) }}" {% if color == key %}aria-current="true"{% endif %}>{{ VERDICTS[key] }} <span class="count">{{ counts[key] }}</span></a>
+    {% endfor %}
+  </nav>
+  {% if searches|length > 1 %}
+    <form method="get" class="inline">
+      <input type="hidden" name="vis" value="{{ view }}">
+      {% if color %}<input type="hidden" name="farge" value="{{ color }}">{% endif %}
+      <label class="visually-hidden" for="sok">Søk</label>
+      <select id="sok" name="sok" data-autosubmit>
+        <option value="">Alle søk</option>
+        {% for s in searches %}<option value="{{ s.id }}" {% if search_filter == s.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+      </select>
+    </form>
+  {% endif %}
+</div>
+
+{% if not cards %}
+  <div class="card empty">
+    {% if view == 'ny' and not tab_counts['ny'] %}
+      <h3>Ingen nye funn akkurat nå</h3>
+      {% if not searches %}
+        <p>Legg inn et søk fra Finn, for eksempel «Scotty Cameron» med makspris. Scraperen følger med og legger nye annonser her.</p>
+        <a class="btn btn--primary" href="{{ url_for('main.sok') }}">Legg til et Finn-søk</a>
+      {% else %}
+        <p>Scraperen sjekker søkene dine jevnlig. Nye annonser dukker opp her.</p>
+      {% endif %}
+    {% elif color %}
+      <h3>Ingen annonser med denne fargen</h3>
+      <p><a href="{{ url_for('main.funn', vis=view, sok=search_filter) }}">Vis alle</a></p>
+    {% else %}
+      <h3>Her er det tomt</h3>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="finds">
+    {% for c in cards %}
+      {% set l = c.listing %}{% set r = c.check %}
+      <article class="find find--{{ r.color }}" id="funn-{{ l.id }}">
+        <a class="find__img" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true">
+          {% if l.image_url %}<img src="{{ l.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+          {% else %}<span class="placeholder">Ingen bilde</span>{% endif %}
+        </a>
+        <div class="find__verdict">{{ flag(r.color, r.label) }}</div>
+        {% if view == 'ny' and l.first_seen_at > previous_seen %}<span class="find__new">Ny</span>{% endif %}
+        <div class="find__body">
+          <div class="find__meta">
+            <span>{{ l.location or 'Ukjent sted' }}</span><span>·</span>
+            <span>{% if l.published_at %}lagt ut {{ l.published_at|tid_siden }}{% else %}funnet {{ l.first_seen_at|tid_siden }}{% endif %}</span>
+          </div>
+          <h3 class="find__title"><a href="{{ l.url }}" target="_blank" rel="noopener noreferrer">{{ l.title }}</a></h3>
+          <div class="find__price">{{ l.price|kr if l.price is not none else 'Uten pris' }}</div>
+          {% if r.expected_sale is not none and r.profit is not none %}
+            <dl class="calc">
+              <div><dt>Forventet salg</dt><dd>{{ r.expected_sale|kr }}</dd></div>
+              <div><dt>Fortjeneste</dt><dd class="{{ 'pos' if r.profit > 0 else 'neg' }}">{{ r.profit|kr(signed=True) }}</dd></div>
+              <div><dt>Maks pris</dt><dd>{{ r.max_price|kr if r.max_price else '–' }}</dd></div>
+            </dl>
+          {% endif %}
+          <p class="find__reason">{{ r.reason }}{% if r.basis %} <span class="muted">{{ r.basis.split('.')[0] }}.</span>{% endif %}</p>
+          <details class="find__fix">
+            <summary>
+              <span>{{ l.brand or 'Ukjent merke' }}{% if l.model %} · {{ l.model }}{% endif %} · {{ TYPE_LABELS.get(l.type, 'Annet') }}</span>
+              <span class="edit">Rett</span>
+            </summary>
+            <form method="post" action="{{ url_for('main.funn_rett', listing_id=l.id) }}">
+              <input type="hidden" name="next" value="{{ here }}#funn-{{ l.id }}">
+              <div class="grid-2 keep">
+                <div class="field"><label for="b{{ l.id }}">Merke</label><input type="text" id="b{{ l.id }}" name="brand" value="{{ l.brand }}" list="merker"></div>
+                <div class="field"><label for="m{{ l.id }}">Modell</label><input type="text" id="m{{ l.id }}" name="model" value="{{ l.model }}"></div>
+              </div>
+              <div class="field">
+                <label for="t{{ l.id }}">Type</label>
+                <select id="t{{ l.id }}" name="type">
+                  {% for key, label in TYPES %}<option value="{{ key }}" {% if l.type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+              </div>
+              <button class="btn btn--small" type="submit">Lagre og regn ut på nytt</button>
+            </form>
+          </details>
+          <div class="find__actions">
+            {% if view == 'kjopt' %}
+              {% if l.inventory_id %}<a class="btn btn--primary" href="{{ url_for('main.lager_endre', item_id=l.inventory_id) }}">Åpne i lageret</a>{% endif %}
+            {% else %}
+              <form class="inline" method="post" action="{{ url_for('main.funn_kjopt', listing_id=l.id) }}" style="flex:1; display:flex">
+                <button class="btn btn--primary" type="submit" style="flex:1">Kjøpt</button>
+              </form>
+              {% if view == 'skjult' %}
+                <form class="inline" method="post" action="{{ url_for('main.funn_vis', listing_id=l.id) }}">
+                  <input type="hidden" name="next" value="{{ here }}">
+                  <button class="btn" type="submit">Vis igjen</button>
+                </form>
+              {% else %}
+                <form class="inline" method="post" action="{{ url_for('main.funn_skjul', listing_id=l.id) }}">
+                  <input type="hidden" name="next" value="{{ here }}">
+                  <button class="btn" type="submit">Skjul</button>
+                </form>
+              {% endif %}
+            {% endif %}
+            <a class="btn btn--ghost" href="{{ url_for('main.prissjekk', funn=l.id) }}" title="Se hele prissjekken">Detaljer</a>
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+  <datalist id="merker">{% for b in brands %}<option value="{{ b }}">{% endfor %}</datalist>
+  {% if pages > 1 %}
+    <nav class="pager" aria-label="Sider">
+      {% if page > 1 %}<a class="btn" href="{{ url_for('main.funn', vis=view, farge=color or None, sok=search_filter, side=page - 1) }}">← Nyere</a>{% endif %}
+      <span class="muted small">Side {{ page }} av {{ pages }} · {{ total }} annonser</span>
+      {% if page < pages %}<a class="btn" href="{{ url_for('main.funn', vis=view, farge=color or None, sok=search_filter, side=page + 1) }}">Eldre →</a>{% endif %}
+    </nav>
+  {% endif %}
+{% endif %}
+{% endblock %}

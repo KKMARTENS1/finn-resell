@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flag, icon, kr_field with context %}
+{% set is_new = not item.id %}
+{% block title %}{{ 'Legg til ting' if is_new else 'Endre ' ~ item.brand }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="small"><a href="{{ url_for('main.lager') }}">← Lager</a></p>
+    <h1>{{ 'Legg til ting' if is_new else (item.brand ~ ' ' ~ item.model)|trim }}</h1>
+  </div>
+</div>
+
+<form method="post" class="form-layout" id="item-form">
+  <div class="card">
+    <section class="form-section">
+      <h2>Tingen</h2>
+      <div class="grid-2">
+        <div class="field">
+          <label for="brand">Merke</label>
+          <input type="text" id="brand" name="brand" value="{{ item.brand }}" list="merker" required autocomplete="off" placeholder="F.eks. Scotty Cameron">
+        </div>
+        <div class="field">
+          <label for="model">Modell</label>
+          <input type="text" id="model" name="model" value="{{ item.model }}" list="modeller" autocomplete="off" placeholder="F.eks. Newport 2">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="type">Type</label>
+          <select id="type" name="type">
+            {% for key, label in TYPES %}<option value="{{ key }}" {% if item.type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="condition">Tilstand</label>
+          <select id="condition" name="condition">
+            {% for value, label in CONDITIONS %}<option value="{{ value }}" {% if item.condition == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="finn_url">Finn-lenke</label>
+        <input type="url" id="finn_url" name="finn_url" value="{{ item.finn_url }}" placeholder="https://www.finn.no/…">
+      </div>
+    </section>
+
+    <section class="form-section">
+      <h2>Kjøp</h2>
+      <div class="grid-2">
+        {{ kr_field('purchase_price', 'Kjøpspris', item.purchase_price) }}
+        <div class="field">
+          <label for="purchase_date">Kjøpsdato</label>
+          <input type="date" id="purchase_date" name="purchase_date" value="{{ item.purchase_date or '' }}">
+        </div>
+      </div>
+    </section>
+
+    <section class="form-section">
+      <h2>Ekstra kostnader</h2>
+      <div class="grid-4 keep">
+        {{ kr_field('cost_grip', 'Grep', item.cost_grip or '') }}
+        {{ kr_field('cost_shipping', 'Frakt', item.cost_shipping or '') }}
+        {{ kr_field('cost_cleaning', 'Rengjøring', item.cost_cleaning or '') }}
+        {{ kr_field('cost_other', 'Annet', item.cost_other or '') }}
+      </div>
+    </section>
+
+    <section class="form-section">
+      <h2>Salg</h2>
+      <div class="field">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          {% for key, label in STATUSES %}<option value="{{ key }}" {% if item.status == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="grid-3">
+        {{ kr_field('listed_price', 'Utlagt pris', item.listed_price, hint='Prisen du har satt på Finn') }}
+        {{ kr_field('sale_price', 'Salgspris', item.sale_price, hint='Det du faktisk fikk') }}
+        <div class="field">
+          <label for="sale_date">Salgsdato</label>
+          <input type="date" id="sale_date" name="sale_date" value="{{ item.sale_date or '' }}">
+          <div class="hint">Blir dagens dato hvis du lar den stå tom</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="form-section">
+      <h2>Notater</h2>
+      <div class="field">
+        <label class="visually-hidden" for="notes">Notater</label>
+        <textarea id="notes" name="notes" placeholder="F.eks. skaftlengde, hvem du kjøpte av, hva som må fikses …">{{ item.notes }}</textarea>
+      </div>
+    </section>
+
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">{{ 'Legg til' if is_new else 'Lagre endringer' }}</button>
+      {% if is_new %}<button class="btn" type="submit" name="again" value="1">Legg til og lag en til</button>{% endif %}
+      <a class="btn btn--ghost" href="{{ url_for('main.lager') }}">Avbryt</a>
+      <span class="spacer"></span>
+      {% if not is_new %}
+        <button class="btn btn--danger" type="submit" form="delete-form">Slett</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <aside class="stack sticky">
+    <div class="card">
+      <h2 style="margin-bottom:14px">Regnestykket</h2>
+      <dl class="summary-list">
+        <div><dt>Kjøpspris</dt><dd data-out="purchase">–</dd></div>
+        <div><dt>Ekstra kostnader</dt><dd data-out="extras">–</dd></div>
+        <div class="total"><dt>Kostnad totalt</dt><dd data-out="cost">–</dd></div>
+        <div><dt data-out="income-label">Salgspris</dt><dd data-out="income">–</dd></div>
+        <div class="total"><dt>Fortjeneste</dt><dd data-out="profit">–</dd></div>
+      </dl>
+      <p class="hint" data-out="note" style="margin-top:10px"></p>
+    </div>
+    {% if hint %}
+      <div class="card">
+        <h2 style="margin-bottom:8px">Anslått salgspris</h2>
+        <div class="hero__value" style="font-size:30px; margin:0 0 8px">{{ hint.expected_sale|kr }}</div>
+        <p class="small muted">{{ hint.basis }}</p>
+        <p class="small" style="margin-top:10px"><a href="{{ url_for('main.prissjekk', merke=item.brand, modell=item.model, type=item.type, tilstand=item.condition, pris=item.purchase_price) }}">Åpne i prissjekken →</a></p>
+      </div>
+    {% endif %}
+  </aside>
+</form>
+{% if not is_new %}
+  <form id="delete-form" method="post" action="{{ url_for('main.lager_slett', item_id=item.id) }}"
+        data-confirm="Vil du slette {{ item.brand }} {{ item.model }}? Dette kan ikke angres."></form>
+{% endif %}
+<datalist id="merker">{% for b in brands %}<option value="{{ b }}">{% endfor %}</datalist>
+<datalist id="modeller">{% for m in models %}<option value="{{ m }}">{% endfor %}</datalist>
+{% endblock %}

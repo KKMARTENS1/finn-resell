@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, kr_field with context %}
+{% block title %}Innstillinger{% endblock %}
+{% block content %}
+{% macro number_field(key, label, suffix, hint=None, step='1') -%}
+<div class="field">
+  <label for="{{ key }}">{{ label }}</label>
+  <div class="suffix">
+    <input type="number" id="{{ key }}" name="{{ key }}" value="{{ '%g'|format(settings[key]) }}"
+           min="{{ limits[key][0] }}" max="{{ limits[key][1] }}" step="{{ step }}" inputmode="decimal">
+    <span>{{ suffix }}</span>
+  </div>
+  {% if hint %}<div class="hint">{{ hint }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+<div class="page-head">
+  <div>
+    <h1>Innstillinger</h1>
+    <p>Juster regelen for når noe er verdt å kjøpe, budsjettet ditt og hvor ofte scraperen sjekker Finn.</p>
+  </div>
+</div>
+
+<form method="post" class="form-layout">
+  <div class="card">
+    <section class="form-section" id="regel">
+      <h2>Regel for «Kjøp»</h2>
+      <div class="grid-2">
+        {{ number_field('min_profit_pct', 'Minst fortjeneste i prosent', '%', 'Regnet av alt du betaler (kjøpspris og ekstra kostnader)', '0.5') }}
+        {{ number_field('min_profit_kr', 'Minst fortjeneste i kroner', 'kr', None, '50') }}
+      </div>
+      <div class="field">
+        <label>Hvordan skal de to kravene brukes?</label>
+        <div class="radio-row">
+          <label><input type="radio" name="rule_mode" value="either" {% if settings.rule_mode != 'both' %}checked{% endif %}> Holder at ett av dem er oppfylt</label>
+          <label><input type="radio" name="rule_mode" value="both" {% if settings.rule_mode == 'both' %}checked{% endif %}> Begge må være oppfylt</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="form-section" id="anslag">
+      <h2>Anslag i prissjekken</h2>
+      <div class="grid-2">
+        {{ number_field('sale_factor_pct', 'Du får av utlagt pris på Finn', '%', 'Ting selges ofte under utlagt pris. 90 % betyr at en putter lagt ut til 3000 kr regnes som solgt for 2700 kr.', '1') }}
+        {{ number_field('default_extra_cost', 'Standard ekstra kostnader', 'kr', 'Brukes til du har egne salg av samme type. Da brukes snittet ditt i stedet.', '10') }}
+        {{ number_field('condition_step_pct', 'Prisjustering per tilstandsnivå', '%', 'Hvor mye tilstanden påvirker prisen. Tilstand 3 (God) er utgangspunktet.', '0.5') }}
+        {{ number_field('min_comparables', 'Annonser som trengs for et sikkert svar', 'stk', 'Med færre annonser å sammenligne med blir svaret gult (Kanskje).') }}
+        {{ number_field('market_months', 'Bruk markedspriser fra de siste', 'mnd') }}
+      </div>
+    </section>
+
+    <section class="form-section" id="budsjett">
+      <h2>Budsjett</h2>
+      {{ number_field('budget_kr', 'Maks penger bundet i lager', 'kr', 'Forsiden varsler deg hvis du går over. Sett 0 for å slå av.', '500') }}
+    </section>
+
+    <section class="form-section" id="scraper">
+      <h2>Scraper</h2>
+      <div class="grid-3">
+        {{ number_field('scrape_interval_min', 'Sjekk Finn hvert', 'min', 'Minst 15 minutter', '5') }}
+        {{ number_field('page_delay_s', 'Pause mellom sider', 'sek', 'Pluss 0–4 tilfeldige sekunder') }}
+        {{ number_field('pages_per_search', 'Sider per søk', 'stk', 'Oftest holder 1. Maks 3.') }}
+      </div>
+    </section>
+
+    <div class="form-actions">
+      <button class="btn btn--primary" type="submit">Lagre innstillinger</button>
+    </div>
+  </div>
+
+  <aside class="stack sticky">
+    <div class="card">
+      <h2 style="margin-bottom:8px">Regelen din nå</h2>
+      <p>Kjøp når forventet fortjeneste er <strong>{{ rule_text }}</strong>.</p>
+    </div>
+    <div class="card">
+      <h2 style="margin-bottom:8px">Dataene dine</h2>
+      <p class="small">Alt lagres i én fil på Macen:</p>
+      <p class="small" style="word-break:break-all; margin:6px 0 12px"><code>{{ db_file }}</code></p>
+      <a class="btn" href="{{ url_for('main.sikkerhetskopi') }}">Last ned sikkerhetskopi</a>
+      <p class="hint">Ta gjerne en kopi av og til, og legg den i iCloud eller på en minnepinne.</p>
+    </div>
+  </aside>
+</form>
+{% endblock %}

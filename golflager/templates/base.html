@@ -1,0 +1,73 @@
+{% from "_macros.html" import icon %}
+{%- set page = request.endpoint or '' -%}
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · Golflager</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23133d2b'/%3E%3Cpath d='M11 6v21' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M12.5 7 24 11l-11.5 4z' fill='%23f2c230'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <a class="logo" href="{{ url_for('main.oversikt') }}">
+      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="rgba(255,255,255,.1)"/>
+        <path d="M11 6v21" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M12.5 7 24 11l-11.5 4z" fill="#f2c230"/>
+      </svg>
+      Golflager
+    </a>
+    <nav class="nav" aria-label="Hovedmeny">
+      <a href="{{ url_for('main.oversikt') }}" {% if page == 'main.oversikt' %}aria-current="page"{% endif %}>{{ icon('home') }}Oversikt</a>
+      <a href="{{ url_for('main.funn') }}" {% if page == 'main.funn' %}aria-current="page"{% endif %}>{{ icon('finds') }}Nye funn
+        {% if nav_new %}<span class="badge" data-new-count>{{ nav_new }}</span>{% endif %}</a>
+      <a href="{{ url_for('main.lager') }}" {% if page.startswith('main.lager') %}aria-current="page"{% endif %}>{{ icon('box') }}Lager</a>
+      <a href="{{ url_for('main.prissjekk') }}" {% if page == 'main.prissjekk' %}aria-current="page"{% endif %}>{{ icon('scale') }}Prissjekk</a>
+      <a href="{{ url_for('main.markedspriser') }}" {% if page == 'main.markedspriser' %}aria-current="page"{% endif %}>{{ icon('chart') }}Markedspriser</a>
+      <a href="{{ url_for('main.sok') }}" {% if page == 'main.sok' %}aria-current="page"{% endif %}>{{ icon('radar') }}Finn-søk</a>
+      <a href="{{ url_for('main.innstillinger') }}" {% if page == 'main.innstillinger' %}aria-current="page"{% endif %}>{{ icon('gear') }}Innstillinger</a>
+    </nav>
+    <div class="side__status">
+      {% if settings.scraper_error %}
+        <span class="dot dot--stop"></span><strong>Scraperen er stoppet</strong>
+      {% elif scraper_running %}
+        <span class="dot dot--busy"></span><strong>Sjekker Finn nå …</strong>
+      {% elif settings.scraper_enabled %}
+        <span class="dot dot--on"></span><strong>Scraperen er på</strong>
+        {% if settings.scraper_last_run %}<div>Sist sjekket {{ settings.scraper_last_run|tid_siden }}</div>{% endif %}
+      {% else %}
+        <span class="dot"></span><strong>Scraperen er av</strong>
+      {% endif %}
+    </div>
+  </aside>
+
+  <main class="main" id="innhold">
+    {% if settings.scraper_error and page != 'main.sok' %}
+      <div class="banner banner--stop" role="alert">
+        {{ icon('alert', 20) }}
+        <div>
+          <p><strong>Scraperen har stoppet.</strong></p>
+          <p>{{ settings.scraper_error }}</p>
+        </div>
+        <a class="btn btn--small" href="{{ url_for('main.sok') }}">Gå til Finn-søk</a>
+      </div>
+    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flashes" role="status">
+          {% for category, message in messages %}
+            <div class="flash flash--{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

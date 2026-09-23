@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon with context %}
+{% block title %}Lager{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Lager</h1>
+    <p>Alt du vurderer, har kjøpt og har solgt.</p>
+  </div>
+  <div class="page-head__actions">
+    <a class="btn btn--primary" href="{{ url_for('main.lager_ny') }}">{{ icon('plus', 16) }}Legg til ting</a>
+  </div>
+</div>
+
+<div class="filters">
+  <nav class="seg" aria-label="Status">
+    <a href="{{ url_for('main.lager', type=type_key or None, q=q or None) }}" {% if not status %}aria-current="true"{% endif %}>Alle</a>
+    <a href="{{ url_for('main.lager', status='lager', type=type_key or None, q=q or None) }}" {% if status == 'lager' %}aria-current="true"{% endif %}>På lager <span class="count">{{ counts['kjopt'] + counts['klargjores'] + counts['til_salgs'] }}</span></a>
+    {% for key, label in STATUSES %}
+      <a href="{{ url_for('main.lager', status=key, type=type_key or None, q=q or None) }}" {% if status == key %}aria-current="true"{% endif %}>{{ label }} <span class="count">{{ counts[key] }}</span></a>
+    {% endfor %}
+  </nav>
+  <form method="get" class="inline" style="display:flex; gap:8px; flex-wrap:wrap; flex:1">
+    {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+    <label class="visually-hidden" for="type">Type</label>
+    <select id="type" name="type" data-autosubmit>
+      <option value="">Alle typer</option>
+      {% for key, label in TYPES %}<option value="{{ key }}" {% if type_key == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <label class="visually-hidden" for="q">Søk</label>
+    <input type="search" id="q" name="q" value="{{ q }}" placeholder="Søk i lageret">
+  </form>
+</div>
+
+<div class="card">
+  {% if items %}
+    <div class="table-wrap">
+      <table class="responsive">
+        <thead>
+          <tr>
+            <th>Ting</th>
+            <th>Status</th>
+            <th>Kjøpt</th>
+            <th class="num">Kostnad totalt</th>
+            <th class="num">Utlagt / solgt</th>
+            <th class="num">Fortjeneste</th>
+            <th class="num">Dager</th>
+            <th><span class="visually-hidden">Handlinger</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in items %}
+            <tr id="vare-{{ i.id }}">
+              <td class="first">
+                <div class="item-cell">
+                  {% if i.image_url %}<img class="thumb" src="{{ i.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
+                  <div>
+                    <div class="item-name"><a href="{{ url_for('main.lager_endre', item_id=i.id) }}">{{ i.brand }} {{ i.model }}</a></div>
+                    <div class="item-sub">{{ TYPE_LABELS.get(i.type, 'Annet') }} · tilstand {{ i.condition }}/5
+                      {% if i.finn_url %} · <a href="{{ i.finn_url }}" target="_blank" rel="noopener noreferrer">Finn</a>{% endif %}</div>
+                  </div>
+                </div>
+              </td>
+              <td data-label="Status"><span class="chip chip--{{ i.status }}">{{ STATUS_LABELS[i.status] }}</span></td>
+              <td data-label="Kjøpt">
+                <div>{% if i.purchase_price is not none %}<span class="num">{{ i.purchase_price|kr }}</span><div class="item-sub">{{ i.purchase_date|dato(short=True) }}</div>{% else %}–{% endif %}</div>
+              </td>
+              <td class="num" data-label="Kostnad totalt">{{ i.cost|kr }}</td>
+              <td class="num" data-label="Utlagt / solgt">
+                <div>{% if i.status == 'solgt' %}{{ i.sale_price|kr }}<div class="item-sub">solgt {{ i.sale_date|dato(short=True) }}</div>
+                {% elif i.listed_price %}{{ i.listed_price|kr }}<div class="item-sub">utlagt</div>
+                {% else %}–{% endif %}</div>
+              </td>
+              <td class="num" data-label="Fortjeneste">
+                {% if i.profit is not none %}<strong class="{{ 'pos' if i.profit > 0 else 'neg' if i.profit < 0 }}">{{ i.profit|kr(signed=True) }}</strong>
+                {% elif i.listed_price and i.status != 'vurderes' %}<span class="muted" title="Hvis den selges for utlagt pris">~{{ (i.listed_price - i.cost)|kr(signed=True) }}</span>
+                {% else %}–{% endif %}
+              </td>
+              <td class="num" data-label="Dager">{{ i.days if i.days is not none else '–' }}</td>
+              <td class="actions"><a class="btn btn--small" href="{{ url_for('main.lager_endre', item_id=i.id) }}">Endre</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td class="first">{{ items|length }} {{ 'ting' }}</td>
+            <td></td><td></td>
+            <td class="num" data-label="Kostnad totalt">{{ totals.cost|kr }}</td>
+            <td></td>
+            <td class="num" data-label="Fortjeneste (solgte)">{{ totals.profit|kr(signed=True) }}</td>
+            <td></td><td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty">
+      {% if status or type_key or q %}
+        <h3>Ingen ting passer filteret</h3>
+        <p><a href="{{ url_for('main.lager') }}">Vis alt i lageret</a></p>
+      {% else %}
+        <h3>Lageret er tomt</h3>
+        <p>Legg til noe du har kjøpt, eller trykk «Kjøpt» på en annonse under Nye funn.</p>
+        <a class="btn btn--primary" href="{{ url_for('main.lager_ny') }}">Legg til ting</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
