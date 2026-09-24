@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import sqlite3
 import tempfile
 from datetime import datetime, timedelta
@@ -80,14 +81,21 @@ def inject_common() -> Dict[str, Any]:
 
 
 def parse_int(value: Optional[str]) -> Optional[int]:
-    text = (value or "").strip()
+    text = (value or "").strip().replace(" ", "").replace(" ", "").lower()
+    text = text.replace("kr", "").replace(",-", "")
     if not text:
         return None
     negative = text.startswith(("-", "−"))
-    digits = "".join(ch for ch in text.split(",")[0] if ch.isdigit())
-    if not digits:
-        return None
-    number = int(digits)
+    text = text.lstrip("-−")
+    # «1500,50» og «1500.50» er desimaler. «2.500» er tusenskille.
+    decimal = re.fullmatch(r"(\d+)[.,](\d{1,2})", text)
+    if decimal:
+        number = int(float(f"{decimal.group(1)}.{decimal.group(2)}") + 0.5)  # vanlig avrunding
+    else:
+        digits = "".join(ch for ch in text.split(",")[0] if ch.isdigit())
+        if not digits:
+            return None
+        number = int(digits)
     return -number if negative else number
 
 

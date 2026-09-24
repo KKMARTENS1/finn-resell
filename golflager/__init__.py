@@ -7,6 +7,7 @@ from flask import Flask
 
 from . import db
 from .config import db_path
+from .errors import register_error_page
 from .formatting import register_filters
 
 
@@ -26,6 +27,7 @@ def create_app(database: Optional[str] = None, start_scraper: bool = True) -> Fl
 
     app.register_blueprint(bp)
     register_filters(app)
+    register_error_page(app)
     worker = ScraperWorker(app.config["DATABASE"])
     app.extensions["scraper"] = worker
     if start_scraper:

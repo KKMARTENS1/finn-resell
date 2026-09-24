@@ -1,5 +1,5 @@
 {% from "_macros.html" import icon %}
-{%- set page = request.endpoint or '' -%}
+{%- set endpoint = request.endpoint or '' -%}
 <!doctype html>
 <html lang="no">
 <head>
@@ -21,14 +21,14 @@
       Golflager
     </a>
     <nav class="nav" aria-label="Hovedmeny">
-      <a href="{{ url_for('main.oversikt') }}" {% if page == 'main.oversikt' %}aria-current="page"{% endif %}>{{ icon('home') }}Oversikt</a>
-      <a href="{{ url_for('main.funn') }}" {% if page == 'main.funn' %}aria-current="page"{% endif %}>{{ icon('finds') }}Nye funn
+      <a href="{{ url_for('main.oversikt') }}" {% if endpoint == 'main.oversikt' %}aria-current="page"{% endif %}>{{ icon('home') }}Oversikt</a>
+      <a href="{{ url_for('main.funn') }}" {% if endpoint == 'main.funn' %}aria-current="page"{% endif %}>{{ icon('finds') }}Nye funn
         {% if nav_new %}<span class="badge" data-new-count>{{ nav_new }}</span>{% endif %}</a>
-      <a href="{{ url_for('main.lager') }}" {% if page.startswith('main.lager') %}aria-current="page"{% endif %}>{{ icon('box') }}Lager</a>
-      <a href="{{ url_for('main.prissjekk') }}" {% if page == 'main.prissjekk' %}aria-current="page"{% endif %}>{{ icon('scale') }}Prissjekk</a>
-      <a href="{{ url_for('main.markedspriser') }}" {% if page == 'main.markedspriser' %}aria-current="page"{% endif %}>{{ icon('chart') }}Markedspriser</a>
-      <a href="{{ url_for('main.sok') }}" {% if page == 'main.sok' %}aria-current="page"{% endif %}>{{ icon('radar') }}Finn-søk</a>
-      <a href="{{ url_for('main.innstillinger') }}" {% if page == 'main.innstillinger' %}aria-current="page"{% endif %}>{{ icon('gear') }}Innstillinger</a>
+      <a href="{{ url_for('main.lager') }}" {% if endpoint.startswith('main.lager') %}aria-current="page"{% endif %}>{{ icon('box') }}Lager</a>
+      <a href="{{ url_for('main.prissjekk') }}" {% if endpoint == 'main.prissjekk' %}aria-current="page"{% endif %}>{{ icon('scale') }}Prissjekk</a>
+      <a href="{{ url_for('main.markedspriser') }}" {% if endpoint == 'main.markedspriser' %}aria-current="page"{% endif %}>{{ icon('chart') }}Markedspriser</a>
+      <a href="{{ url_for('main.sok') }}" {% if endpoint == 'main.sok' %}aria-current="page"{% endif %}>{{ icon('radar') }}Finn-søk</a>
+      <a href="{{ url_for('main.innstillinger') }}" {% if endpoint == 'main.innstillinger' %}aria-current="page"{% endif %}>{{ icon('gear') }}Innstillinger</a>
     </nav>
     <div class="side__status">
       {% if settings.scraper_error %}
@@ -45,7 +45,7 @@
   </aside>
 
   <main class="main" id="innhold">
-    {% if settings.scraper_error and page != 'main.sok' %}
+    {% if settings.scraper_error and endpoint != 'main.sok' %}
       <div class="banner banner--stop" role="alert">
         {{ icon('alert', 20) }}
         <div>

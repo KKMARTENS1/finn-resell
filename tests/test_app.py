@@ -181,3 +181,47 @@ def test_backup_download(client, filled):
     response = client.get("/innstillinger/sikkerhetskopi")
     assert response.status_code == 200
     assert response.data[:15] == b"SQLite format 3"
+
+
+def test_many_finds_show_several_pages(client, conn):
+    # Mer enn 60 annonser gir sideknapper. Dette krasjet i første versjon.
+    for i in range(130):
+        add_listing(conn, 700000 + i, f"Scotty Cameron Newport 2 nr {i}", 2000 + i,
+                    "Scotty Cameron", "Newport 2", "putter")
+    first = client.get("/funn")
+    assert first.status_code == 200
+    html = first.get_data(as_text=True)
+    assert "Side 1 av 3" in html
+    assert 'aria-current="page"' in html  # menyen markerer fortsatt riktig side
+    second = client.get("/funn?side=2")
+    assert second.status_code == 200
+    assert "Side 2 av 3" in second.get_data(as_text=True)
+
+
+def test_errors_show_a_friendly_page_and_are_logged(app, db_path, monkeypatch):
+    from pathlib import Path
+
+    from golflager import views
+
+    app.config["TESTING"] = False
+    app.config["PROPAGATE_EXCEPTIONS"] = False
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("testfeil")
+
+    monkeypatch.setattr(views.stats, "dashboard", broken)
+    response = app.test_client().get("/")
+    assert response.status_code == 500
+    html = response.get_data(as_text=True)
+    assert "Noe gikk galt" in html and "testfeil" in html
+    log_file = Path(db_path).parent / "feilsøking" / "feillogg.txt"
+    assert "RuntimeError: testfeil" in log_file.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("2500", 2500), ("2 500", 2500), ("2 500 kr", 2500), ("2.500", 2500),
+    ("1500,50", 1501), ("1500.50", 1501), ("2500,-", 2500), ("", None), ("abc", None),
+])
+def test_parse_int_understands_norwegian_numbers(text, expected):
+    from golflager.views import parse_int
+    assert parse_int(text) == expected

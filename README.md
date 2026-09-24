@@ -80,6 +80,16 @@ Du slår scraperen av og på under **Finn-søk**.
 
 ---
 
+## Oppdatere til en ny versjon
+
+1. Stopp appen (`Ctrl + C` i Terminal).
+2. Last ned ZIP-filen på nytt fra GitHub (**Code → Download ZIP**), og bytt ut den gamle mappen med den nye.
+3. Start appen som vanlig. Første oppstart etter en oppdatering tar et minutt eller to.
+
+Søkene, lageret og innstillingene dine ligger i `~/Golflager` og blir med over av seg selv.
+
+---
+
 ## Hvor ligger dataene?
 
 Alt lagres i filen `golflager.db` i mappen **Golflager** i hjemmemappen din (`~/Golflager/`). Fordi filen ligger utenfor app-mappen, beholder du dataene når du laster ned en ny versjon av appen.
@@ -96,6 +106,7 @@ Du tar sikkerhetskopi under **Innstillinger → Last ned sikkerhetskopi**. Legg 
 | Appen åpner seg ikke i nettleseren | Se i Terminal-vinduet hvilken adresse den kjører på (for eksempel `http://localhost:8001` hvis 8000 var opptatt), og åpne den selv. |
 | «Scraperen har stoppet» | Les meldingen. Er det en blokkering (403, 429 eller robot-sjekk), bør du vente noen timer og gjerne sette opp tiden mellom sjekkene før du slår den på igjen. Har Finn endret nettsiden, ligger en kopi av siden i `~/Golflager/feilsøking/`, slik at scraperen kan oppdateres. |
 | Et søk gir «Ingen treff» | Åpne lenken under Finn-søk og se om søket faktisk har treff på Finn. |
+| «Noe gikk galt på denne siden» | Resten av appen virker som regel. Feilen lagres i `~/Golflager/feilsøking/feillogg.txt`. Send den filen, så blir feilen fikset. |
 | Feil merke, modell eller type på en annonse | Trykk **Rett** på annonsen under Nye funn. |
 
 ---
