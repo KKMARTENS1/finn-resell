@@ -49,9 +49,18 @@ Trykk `Ctrl + C` i Terminal-vinduet, eller lukk vinduet. Terminal-vinduet må st
 
 1. Først sammenligner den med **dine egne salg** av samme merke, modell og type.
 2. Har du ikke solgt noe lignende, bruker den **markedsprisene**, altså det selgere ber om på Finn. Ting selges ofte under utlagt pris, så den regner med 90 % av typisk utlagt pris. Du kan endre prosenten.
-3. Prisen justeres litt for tilstand, standard 5 % per nivå.
+3. Prisen justeres for tilstand. Standard er at «Slitt» er verdt 60 % og «Brukbar» 80 % av samme ting i «God» stand, mens «Meget god» er verdt 105 % og «Som ny» 115 %. Verdiene kan endres i Innstillinger.
 4. **Forventet fortjeneste** = forventet salgspris − kjøpspris − ekstra kostnader.
 5. Standardregelen er at noe er verdt å kjøpe når fortjenesten er **minst 30 % eller minst 500 kr**. Du kan endre regelen i Innstillinger, også slik at begge kravene må være oppfylt.
+
+### Tilstanden på annonser fra Finn
+
+Scraperen leser bare søkeresultatlisten, ikke hver annonse. Den ser derfor ikke beskrivelsen og bare ett bilde. Slik håndteres tilstanden:
+
+- Ord i **tittelen** som «oppripet», «slitt», «riper», «defekt», «pent brukt» og «som ny» brukes til å anslå tilstanden automatisk.
+- Står det ingenting om tilstanden i tittelen, er den **ukjent**, og kortet sier fra om at du bør se på bildene.
+- Er annonsen **mye billigere enn vanlig** (under halvparten) og tilstanden er ukjent, blir den gul med «Sjekk tilstand». Det er ofte et tegn på skader.
+- Har du sett bildene, kan du sette tilstanden selv under **Rett**. Da regnes prissjekken ut på nytt.
 
 Fargene betyr:
 

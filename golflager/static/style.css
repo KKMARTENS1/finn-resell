@@ -393,6 +393,9 @@ details.table-view table { margin-top: 10px; }
 .pos { color: var(--go-ink); }
 .neg { color: var(--stop-ink); }
 .find__reason { font-size: 13px; color: var(--ink-2); }
+.find__cond { font-size: 13px; color: var(--ink-2); display: flex; gap: 6px; align-items: flex-start; }
+.find__cond svg { flex: none; margin-top: 2px; }
+.find__cond--unknown { color: var(--maybe-ink); }
 .find__fix summary { cursor: pointer; font-size: 13px; color: var(--ink-2); list-style: none; display: flex; justify-content: space-between; gap: 8px; }
 .find__fix summary::-webkit-details-marker { display: none; }
 .find__fix summary .edit { color: var(--accent); font-weight: 600; flex: none; }

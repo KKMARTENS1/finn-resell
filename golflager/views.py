@@ -143,7 +143,7 @@ def oversikt():
     best = []
     for row in rows:
         check = prices.check(row["brand"], row["model"], row["type"], row["price"],
-                             exclude_listing_id=row["id"])
+                             condition=row["condition"], exclude_listing_id=row["id"])
         if check.color == "gronn":
             best.append({"listing": row, "check": check})
         if len(best) >= 4:
@@ -180,7 +180,7 @@ def funn():
     counts = {"gronn": 0, "gul": 0, "rod": 0}
     for row in rows:
         check = prices.check(row["brand"], row["model"], row["type"], row["price"],
-                             exclude_listing_id=row["id"])
+                             condition=row["condition"], exclude_listing_id=row["id"])
         counts[check.color] += 1
         if color and check.color != color:
             continue
@@ -235,8 +235,9 @@ def funn_kjopt(listing_id: int):
     cursor = conn.execute(
         """INSERT INTO inventory (brand, model, type, condition, finn_url, purchase_price,
                purchase_date, status, notes, image_url, created_at, updated_at)
-           VALUES (?, ?, ?, 3, ?, ?, ?, 'kjopt', ?, ?, ?, ?)""",
-        (listing["brand"], listing["model"], listing["type"], listing["url"], listing["price"],
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'kjopt', ?, ?, ?, ?)""",
+        (listing["brand"], listing["model"], listing["type"], listing["condition"] or 3,
+         listing["url"], listing["price"],
          today_str(), f"Finn-annonse: {listing['title']}", listing["image_url"], now, now),
     )
     conn.execute(
@@ -274,13 +275,16 @@ def funn_rett(listing_id: int):
     type_key = request.form.get("type", "annet")
     if type_key not in TYPE_LABELS:
         type_key = "annet"
+    condition = parse_int(request.form.get("condition"))
+    if condition is not None:
+        condition = max(1, min(5, condition))
     conn.execute(
-        "UPDATE listings SET brand = ?, model = ?, type = ? WHERE id = ?",
+        "UPDATE listings SET brand = ?, model = ?, type = ?, condition = ? WHERE id = ?",
         (request.form.get("brand", "").strip(), request.form.get("model", "").strip(), type_key,
-         listing_id),
+         condition, listing_id),
     )
     conn.commit()
-    flash("Merke, modell og type er oppdatert, og prissjekken er regnet ut på nytt.", "ok")
+    flash("Annonsen er oppdatert, og prissjekken er regnet ut på nytt.", "ok")
     return redirect(safe_next(url_for("main.funn")))
 
 
@@ -484,7 +488,8 @@ def prissjekk():
         "brand": args.get("merke", "").strip(),
         "model": args.get("modell", "").strip(),
         "type": args.get("type", "putter"),
-        "condition": parse_int(args.get("tilstand")) or 3,
+        # Uten valg er utgangspunktet «God». Tomt valg betyr «Vet ikke».
+        "condition": parse_int(args.get("tilstand")) if "tilstand" in args else 3,
         "price": parse_int(args.get("pris")),
         "extras": parse_int(args.get("ekstra")),
     }
@@ -494,10 +499,11 @@ def prissjekk():
         listing = conn.execute("SELECT * FROM listings WHERE id = ?", (listing_id,)).fetchone()
         if listing is not None and not args.get("merke"):
             form.update(brand=listing["brand"], model=listing["model"], type=listing["type"],
-                        price=listing["price"])
+                        price=listing["price"], condition=listing["condition"])
     if form["type"] not in TYPE_LABELS:
         form["type"] = "annet"
-    form["condition"] = max(1, min(5, form["condition"]))
+    if form["condition"] is not None:
+        form["condition"] = max(1, min(5, form["condition"]))
     result = None
     if form["brand"] or form["price"] is not None:
         prices = PriceData(conn, settings)
@@ -743,7 +749,8 @@ def api_status():
 
 SETTING_FIELDS = [
     "min_profit_pct", "min_profit_kr", "sale_factor_pct", "default_extra_cost",
-    "condition_step_pct", "min_comparables", "market_months", "budget_kr",
+    "cond_value_5", "cond_value_4", "cond_value_2", "cond_value_1",
+    "min_comparables", "market_months", "budget_kr",
     "scrape_interval_min", "page_delay_s", "pages_per_search",
 ]
 
@@ -766,7 +773,7 @@ def innstillinger():
             if value < low or value > high:
                 adjusted.append(key)
                 value = max(low, min(high, value))
-            if key not in ("min_profit_pct", "sale_factor_pct", "condition_step_pct"):
+            if key not in ("min_profit_pct", "sale_factor_pct"):
                 value = int(round(value))
             set_setting(conn, key, value)
         mode = request.form.get("rule_mode", "either")

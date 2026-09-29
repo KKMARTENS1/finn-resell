@@ -81,9 +81,14 @@
             </dl>
           {% endif %}
           <p class="find__reason">{{ r.reason }}{% if r.basis %} <span class="muted">{{ r.basis.split('.')[0] }}.</span>{% endif %}</p>
+          {% if l.condition %}
+            <p class="find__cond">Tilstand: <strong>{{ CONDITION_LABELS[l.condition] }}</strong></p>
+          {% elif view != 'kjopt' %}
+            <p class="find__cond find__cond--unknown">{{ icon("alert", 14) }}Tilstand ukjent – se bildene før du kjøper.</p>
+          {% endif %}
           <details class="find__fix">
             <summary>
-              <span>{{ l.brand or 'Ukjent merke' }}{% if l.model %} · {{ l.model }}{% endif %} · {{ TYPE_LABELS.get(l.type, 'Annet') }}</span>
+              <span>{{ l.brand or 'Ukjent merke' }}{% if l.model %} · {{ l.model }}{% endif %} · {{ TYPE_LABELS.get(l.type, 'Annet') }}{% if l.condition %} · tilstand {{ l.condition }}/5{% endif %}</span>
               <span class="edit">Rett</span>
             </summary>
             <form method="post" action="{{ url_for('main.funn_rett', listing_id=l.id) }}">
@@ -92,11 +97,20 @@
                 <div class="field"><label for="b{{ l.id }}">Merke</label><input type="text" id="b{{ l.id }}" name="brand" value="{{ l.brand }}" list="merker"></div>
                 <div class="field"><label for="m{{ l.id }}">Modell</label><input type="text" id="m{{ l.id }}" name="model" value="{{ l.model }}"></div>
               </div>
-              <div class="field">
-                <label for="t{{ l.id }}">Type</label>
-                <select id="t{{ l.id }}" name="type">
-                  {% for key, label in TYPES %}<option value="{{ key }}" {% if l.type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
-                </select>
+              <div class="grid-2 keep">
+                <div class="field">
+                  <label for="t{{ l.id }}">Type</label>
+                  <select id="t{{ l.id }}" name="type">
+                    {% for key, label in TYPES %}<option value="{{ key }}" {% if l.type == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="c{{ l.id }}">Tilstand</label>
+                  <select id="c{{ l.id }}" name="condition">
+                    <option value="" {% if not l.condition %}selected{% endif %}>Vet ikke</option>
+                    {% for value, label in CONDITIONS %}<option value="{{ value }}" {% if l.condition == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                  </select>
+                </div>
               </div>
               <button class="btn btn--small" type="submit">Lagre og regn ut på nytt</button>
             </form>

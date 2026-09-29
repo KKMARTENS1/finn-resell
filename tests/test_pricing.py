@@ -32,7 +32,7 @@ def test_condition_adjusts_own_sales(conn):
     add_item(conn, status="solgt", sale_price=3000, sale_date="2026-03-01", condition=3)
     r = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=1000,
               condition=5)
-    assert r.expected_sale == 3300  # +5 % per nivå, to nivåer opp
+    assert r.expected_sale == 3450  # «Som ny» er verdt 115 % av «God»
 
 
 def test_market_prices_with_sale_factor(conn):
@@ -116,3 +116,30 @@ def test_budget_note(conn):
         add_listing(conn, 8000 + i, "Ping Anser", 3000, "Ping", "Anser", "putter")
     r = check(conn, brand="Ping", model="Anser", type_key="putter", price=1000)
     assert any("over budsjettet" in note for note in r.notes)
+
+
+def test_worn_listing_is_valued_lower(conn):
+    for i in range(3):
+        add_listing(conn, 9100 + i, "Scotty Cameron Newport 2", 3000, "Scotty Cameron",
+                    "Newport 2", "putter")
+    good = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=1600,
+                 condition=3)
+    worn = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=1600,
+                 condition=1)
+    assert good.expected_sale == 2700 and good.color == "gronn"
+    assert worn.expected_sale == 1620  # 60 % av 2700
+    assert worn.color == "rod" and worn.decision == "La være"
+
+
+def test_suspiciously_cheap_with_unknown_condition_is_yellow(conn):
+    for i in range(3):
+        add_listing(conn, 9200 + i, "Scotty Cameron Newport 2", 3000, "Scotty Cameron",
+                    "Newport 2", "putter")
+    r = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=1200)
+    assert r.meets_rule and r.suspicious
+    assert r.color == "gul" and r.label == "Sjekk tilstand"
+    assert "Uvanlig billig" in r.reason
+    # Når du har sett bildene og satt tilstanden, er det ikke lenger mistenkelig
+    r = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=1200,
+              condition=3)
+    assert not r.suspicious and r.color == "gronn"

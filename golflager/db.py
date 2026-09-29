@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS listings (
     brand         TEXT NOT NULL DEFAULT '',
     model         TEXT NOT NULL DEFAULT '',
     type          TEXT NOT NULL DEFAULT 'annet',
+    condition     INTEGER,
     status        TEXT NOT NULL DEFAULT 'ny',
     first_seen_at TEXT NOT NULL,
     last_seen_at  TEXT NOT NULL,
@@ -95,7 +96,11 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     # Anslag i prissjekken
     "sale_factor_pct": 90.0,  # utlagt pris på Finn -> forventet salgspris
     "default_extra_cost": 150,
-    "condition_step_pct": 5.0,  # prisjustering per tilstandsnivå
+    # Hva en ting er verdt i prosent av samme ting i «God» stand (tilstand 3)
+    "cond_value_5": 115,
+    "cond_value_4": 105,
+    "cond_value_2": 80,
+    "cond_value_1": 60,
     "min_comparables": 3,
     "market_months": 12,
     # Budsjett
@@ -121,7 +126,10 @@ LIMITS = {
     "min_profit_kr": (0, 1_000_000),
     "sale_factor_pct": (30, 150),
     "default_extra_cost": (0, 100_000),
-    "condition_step_pct": (0, 30),
+    "cond_value_5": (50, 200),
+    "cond_value_4": (50, 200),
+    "cond_value_2": (10, 150),
+    "cond_value_1": (5, 150),
     "min_comparables": (1, 50),
     "market_months": (1, 120),
     "budget_kr": (0, 10_000_000),
@@ -150,6 +158,7 @@ def init_db(path: str) -> None:
     try:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
+        _migrate(conn)
         for key, value in DEFAULT_SETTINGS.items():
             conn.execute(
                 "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (key, str(value))
@@ -161,6 +170,20 @@ def init_db(path: str) -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Oppdaterer databaser laget av eldre versjoner av appen."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(listings)")}
+    if "condition" not in columns:
+        from .classify import detect_condition
+
+        conn.execute("ALTER TABLE listings ADD COLUMN condition INTEGER")
+        for row in conn.execute("SELECT id, title FROM listings").fetchall():
+            condition = detect_condition(row["title"])
+            if condition is not None:
+                conn.execute("UPDATE listings SET condition = ? WHERE id = ?",
+                             (condition, row["id"]))
 
 
 def _convert(raw: Optional[str], default: Any) -> Any:

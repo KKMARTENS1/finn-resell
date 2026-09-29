@@ -1,6 +1,6 @@
 import pytest
 
-from golflager.classify import classify, is_wanted_ad, normalize
+from golflager.classify import classify, detect_condition, is_wanted_ad, normalize
 
 
 @pytest.mark.parametrize(
@@ -43,3 +43,22 @@ def test_wanted_ads_are_detected():
     assert is_wanted_ad("Ønskes kjøpt: Scotty Cameron")
     assert is_wanted_ad("KJØPES - Ping putter")
     assert not is_wanted_ad("Scotty Cameron, ønskes solgt raskt")
+
+
+@pytest.mark.parametrize("title, expected", [
+    ("Scotty Cameron Newport 2 oppripet", 1),
+    ("Callaway driver, knekt skaft", 1),
+    ("Driver med bulk i hodet", 1),
+    ("Vokey SM9 mye brukt", 2),
+    ("Ping Anser putter, slitt grep", 2),
+    ("Putter med brukspreg", 2),
+    ("Odyssey putter, noen små riper", 3),
+    ("Titleist TSR3 pent brukt", 4),
+    ("Ping G425 ingen riper", 4),
+    ("Scotty Cameron som ny", 5),
+    ("Mizuno jernsett, strøken stand", 5),
+    ("Scotty Cameron Newport 2", None),
+    ("Titleist T100 rustfritt stål", None),
+])
+def test_condition_from_title(title, expected):
+    assert detect_condition(title) == expected

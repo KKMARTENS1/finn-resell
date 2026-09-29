@@ -22,7 +22,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 
-from .classify import classify, is_wanted_ad
+from .classify import classify, detect_condition, is_wanted_ad
 from .db import connect, get_settings, log_event, now_str, set_setting
 from .finn_parser import ITEM_ID_RE, ParsedAd, looks_blocked, parse_search_page
 
@@ -155,10 +155,11 @@ def store_ads(conn: sqlite3.Connection, search: sqlite3.Row, ads: Iterable[Parse
             )
             cursor = conn.execute(
                 """INSERT INTO listings (finn_id, search_id, title, price, location, published_at,
-                       url, image_url, brand, model, type, status, first_seen_at, last_seen_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ny', ?, ?)""",
+                       url, image_url, brand, model, type, condition, status, first_seen_at,
+                       last_seen_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ny', ?, ?)""",
                 (ad.finn_id, search["id"], ad.title, ad.price, ad.location, published, ad.url,
-                 ad.image_url, brand, model, type_key, now, now),
+                 ad.image_url, brand, model, type_key, detect_condition(ad.title), now, now),
             )
             if ad.price is not None:
                 conn.execute(

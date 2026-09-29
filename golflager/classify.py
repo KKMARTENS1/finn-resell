@@ -207,3 +207,64 @@ WANTED_RE = re.compile(
 def is_wanted_ad(title: str) -> bool:
     """«Ønskes kjøpt»-annonser er ikke noe du kan kjøpe."""
     return bool(WANTED_RE.search(title or ""))
+
+
+# ---------------------------------------------------------------------------
+# Tilstand fra tittelen
+
+_NEGATED_WEAR_RE = re.compile(
+    r"\b(?:ingen|uten|null|nesten\s+ingen)\s+(?:synlige\s+)?(?:riper|ripe|skader|skade|merker"
+    r"|bruksmerker|brukspreg|slitasje|hakk|skrammer)\b",
+    re.IGNORECASE,
+)
+_MILD_WEAR_RE = re.compile(
+    r"\b(?:små|lette|minimale|minimalt|lite|noen\s+få|få|litt)\s+(?:med\s+)?(?:riper|ripe|merker"
+    r"|bruksmerker|brukspreg|slitasje|skrammer)\b",
+    re.IGNORECASE,
+)
+# 1 – Slitt: tydelige skader eller kraftig slitasje
+_SEVERE_RE = re.compile(
+    r"oppripe\w*|\bdefekt\w*|\bknekt\w*|ødelagt|til\s+deler|\brust(?:en|et|ete|flekker)?\b"
+    r"|\bbulk(?:er|et|ete)?\b|\bsprekk\w*|\bskadet\b|\bskader?\b|mye\s+riper|masse\s+riper"
+    r"|hardt\s+brukt|kraftig\w*\s+(?:brukt|slitt|slitasje|riper)|trenger\s+reparasjon",
+    re.IGNORECASE,
+)
+# 2 – Brukbar: vanlig, synlig slitasje
+_WORN_RE = re.compile(
+    r"\bslitt\w*|slitasje|\briper\b|\bripe\b|ripete|brukspreg|bruksmerker|skrammer|\bhakk\b"
+    r"|mye\s+brukt|godt\s+brukt|en\s+del\s+brukt|trenger\s+nytt\s+grep|\bok\s+stand\b|brukbar",
+    re.IGNORECASE,
+)
+_AS_NEW_RE = re.compile(
+    r"som\s+ny|ubrukt|aldri\s+brukt|\bi\s+plast\b|med\s+plast|helt\s+ny\b|strøken|\bmint\b"
+    r"|ny\s+i\s+eske",
+    re.IGNORECASE,
+)
+_GOOD_RE = re.compile(
+    r"pent\s+brukt|lite\s+brukt|\bpen\s+stand|god\s+stand|fin\s+stand|meget\s+god|veldig\s+god"
+    r"|nesten\s+ny|\bpen\b|\bpent\b|\bfin\b",
+    re.IGNORECASE,
+)
+
+
+def detect_condition(title: str) -> Optional[int]:
+    """Gjetter tilstand (1–5) ut fra ord i tittelen. None betyr at tittelen ikke sier noe.
+
+    Er det tegn på slitasje, vinner den laveste tilstanden, så prissjekken heller er for
+    forsiktig enn for optimistisk.
+    """
+    negated = bool(_NEGATED_WEAR_RE.search(title or ""))  # «ingen riper» er et godt tegn
+    text = _NEGATED_WEAR_RE.sub(" ", title or "")
+    if _SEVERE_RE.search(text):
+        return 1
+    mild = bool(_MILD_WEAR_RE.search(text))
+    text = _MILD_WEAR_RE.sub(" ", text)
+    if _WORN_RE.search(text):
+        return 2
+    if mild:
+        return 3
+    if _AS_NEW_RE.search(text):
+        return 5
+    if _GOOD_RE.search(text) or negated:
+        return 4
+    return None

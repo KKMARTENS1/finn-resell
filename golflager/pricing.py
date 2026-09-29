@@ -45,6 +45,9 @@ class PriceCheck:
     source: str = ""  # salg / marked / ""
     confidence: str = "ingen"  # god / lav / ingen
     max_price: Optional[int] = None
+    condition: Optional[int] = None  # None = ukjent
+    typical_price: Optional[int] = None
+    suspicious: bool = False  # uvanlig billig og ukjent tilstand
     comparables: List[Comparable] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
 
@@ -61,8 +64,16 @@ def _model_match(query_key: str, candidate_key: str) -> Optional[str]:
     return None
 
 
-def _clamp(value: float, low: float, high: float) -> float:
-    return max(low, min(high, value))
+# Annonser under denne andelen av vanlig pris er «for gode til å være sanne» når
+# tilstanden er ukjent. Det skyldes ofte skader eller slitasje som bare synes på bildene.
+SUSPICIOUS_SHARE = 0.5
+
+
+def condition_factor(settings: Dict[str, Any], condition: Optional[int]) -> float:
+    """Verdi i forhold til samme ting i «God» stand (tilstand 3)."""
+    if not condition or condition == 3:
+        return 1.0
+    return float(settings.get(f"cond_value_{int(condition)}", 100)) / 100
 
 
 def rule_text(settings: Dict[str, Any]) -> str:
@@ -157,10 +168,9 @@ class PriceData:
     ) -> PriceCheck:
         s = self.settings
         brand_key, model_key = normalize(brand), normalize(model)
-        step = float(s["condition_step_pct"]) / 100
         factor = float(s["sale_factor_pct"]) / 100
         min_comp = int(s["min_comparables"])
-        result = PriceCheck(price=price)
+        result = PriceCheck(price=price, condition=condition)
 
         tiers = [
             ("salg", "exact"), ("salg", "similar"), ("marked", "exact"), ("marked", "similar"),
@@ -185,7 +195,8 @@ class PriceData:
             for item in chosen:
                 adjust = 1.0
                 if condition and item["condition"]:
-                    adjust = _clamp(1 + step * (condition - int(item["condition"])), 0.5, 1.5)
+                    adjust = (condition_factor(s, condition)
+                              / condition_factor(s, int(item["condition"])))
                 comps.append(Comparable(
                     label=f"{item['brand']} {item['model']}".strip(),
                     price=int(item["sale_price"]),
@@ -196,6 +207,7 @@ class PriceData:
                     url=item["finn_url"] or "",
                 ))
             result.expected_sale = int(round(median(c.adjusted for c in comps)))
+            result.typical_price = int(round(median(c.price for c in comps)))
             result.comparables = sorted(comps, key=lambda c: c.date, reverse=True)
             n = len(comps)
             what = {"exact": "samme modell", "similar": "lignende modell",
@@ -203,7 +215,7 @@ class PriceData:
             result.basis = f"Basert på {n} {'eget salg' if n == 1 else 'egne salg'} ({what})."
             result.confidence = "lav" if chosen_level == "broad" else "god"
         elif chosen_source == "marked":
-            adjust = _clamp(1 + step * ((condition or 3) - 3), 0.5, 1.5)
+            adjust = condition_factor(s, condition)
             comps = [Comparable(
                 label=item["title"],
                 price=int(item["price"]),
@@ -213,6 +225,7 @@ class PriceData:
                 url=item["url"],
             ) for item in chosen]
             typical = median(c.price for c in comps)
+            result.typical_price = int(round(typical))
             result.expected_sale = int(round(typical * factor * adjust))
             result.comparables = sorted(comps, key=lambda c: c.date, reverse=True)
             n = len(comps)
@@ -270,9 +283,21 @@ class PriceData:
         max_price = max(by_kr, by_pct) if either else min(by_kr, by_pct)
         result.max_price = max(0, int(max_price // 10 * 10))
 
+        result.suspicious = (
+            condition is None and result.typical_price is not None
+            and price < result.typical_price * SUSPICIOUS_SHARE
+        )
+
         if result.meets_rule:
             result.decision = "Kjøp"
-            if result.confidence == "god":
+            if result.suspicious:
+                result.color, result.label = "gul", "Sjekk tilstand"
+                result.reason = (
+                    f"Uvanlig billig: vanlig pris er rundt {result.typical_price:,} kr. Det betyr "
+                    "ofte skader eller mye slitasje. Se nøye på bildene, og sett tilstanden hvis "
+                    "den er dårlig.".replace(",", " ")
+                )
+            elif result.confidence == "god":
                 result.color, result.label = "gronn", "Kjøp"
                 result.reason = "Oppfyller regelen din."
             else:

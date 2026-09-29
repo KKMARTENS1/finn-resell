@@ -38,6 +38,7 @@
         <label for="tilstand">Tilstand</label>
         <select id="tilstand" name="tilstand">
           {% for value, label in CONDITIONS %}<option value="{{ value }}" {% if form.condition == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          <option value="" {% if form.condition is none %}selected{% endif %}>Vet ikke</option>
         </select>
       </div>
     </div>
@@ -101,7 +102,7 @@
             </table>
           </div>
           <p class="hint" style="margin-top:10px">
-            {% if r.source == 'salg' %}«Justert» tar hensyn til forskjell i tilstand ({{ settings.condition_step_pct|tall }} % per nivå).
+            {% if r.source == 'salg' %}«Justert» tar hensyn til forskjell i tilstand.
             {% else %}«Justert» er utlagt pris × {{ settings.sale_factor_pct|tall }} %, justert for tilstanden du valgte.{% endif %}
             Forventet salgspris er midtverdien (medianen).
           </p>

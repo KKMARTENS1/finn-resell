@@ -43,9 +43,19 @@
       <div class="grid-2">
         {{ number_field('sale_factor_pct', 'Du får av utlagt pris på Finn', '%', 'Ting selges ofte under utlagt pris. 90 % betyr at en putter lagt ut til 3000 kr regnes som solgt for 2700 kr.', '1') }}
         {{ number_field('default_extra_cost', 'Standard ekstra kostnader', 'kr', 'Brukes til du har egne salg av samme type. Da brukes snittet ditt i stedet.', '10') }}
-        {{ number_field('condition_step_pct', 'Prisjustering per tilstandsnivå', '%', 'Hvor mye tilstanden påvirker prisen. Tilstand 3 (God) er utgangspunktet.', '0.5') }}
         {{ number_field('min_comparables', 'Annonser som trengs for et sikkert svar', 'stk', 'Med færre annonser å sammenligne med blir svaret gult (Kanskje).') }}
         {{ number_field('market_months', 'Bruk markedspriser fra de siste', 'mnd') }}
+      </div>
+    </section>
+
+    <section class="form-section" id="tilstand">
+      <h2>Verdi etter tilstand</h2>
+      <p class="hint" style="margin:-6px 0 12px">Hva en ting er verdt i forhold til samme ting i «God» stand (tilstand 3 = 100 %). Brukes når prissjekken tar hensyn til tilstanden.</p>
+      <div class="grid-4 keep">
+        {{ number_field('cond_value_5', '5 – Som ny', '%') }}
+        {{ number_field('cond_value_4', '4 – Meget god', '%') }}
+        {{ number_field('cond_value_2', '2 – Brukbar', '%') }}
+        {{ number_field('cond_value_1', '1 – Slitt', '%') }}
       </div>
     </section>
 

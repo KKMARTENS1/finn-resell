@@ -225,3 +225,52 @@ def test_errors_show_a_friendly_page_and_are_logged(app, db_path, monkeypatch):
 def test_parse_int_understands_norwegian_numbers(text, expected):
     from golflager.views import parse_int
     assert parse_int(text) == expected
+
+
+def test_condition_can_be_set_on_a_find(client, filled, conn):
+    listing_id = conn.execute("SELECT id FROM listings WHERE finn_id = '200'").fetchone()[0]
+    html = client.get("/funn").get_data(as_text=True)
+    assert "Tilstand ukjent" in html
+    client.post(f"/funn/{listing_id}/rett", data={"brand": "Ping", "model": "Anser",
+                                                 "type": "putter", "condition": "1"})
+    assert conn.execute("SELECT condition FROM listings WHERE id = ?",
+                        (listing_id,)).fetchone()[0] == 1
+    assert "1 – Slitt" in client.get("/funn").get_data(as_text=True)
+    client.post(f"/funn/{listing_id}/kjopt")
+    item = conn.execute("SELECT condition FROM inventory ORDER BY id DESC LIMIT 1").fetchone()
+    assert item[0] == 1
+    client.post(f"/funn/{listing_id}/rett", data={"brand": "Ping", "model": "Anser",
+                                                 "type": "putter", "condition": ""})
+    assert conn.execute("SELECT condition FROM listings WHERE id = ?",
+                        (listing_id,)).fetchone()[0] is None
+
+
+def test_price_check_from_find_uses_its_condition(client, filled, conn):
+    listing_id = conn.execute("SELECT id FROM listings WHERE finn_id = '200'").fetchone()[0]
+    html = client.get(f"/prissjekk?funn={listing_id}").get_data(as_text=True)
+    assert '<option value="" selected>Vet ikke</option>' in html
+
+
+def test_old_database_gets_condition_column(tmp_path):
+    import sqlite3
+
+    from golflager import create_app
+
+    path = tmp_path / "gammel.db"
+    old = sqlite3.connect(path)
+    old.executescript("""
+        CREATE TABLE listings (id INTEGER PRIMARY KEY AUTOINCREMENT, finn_id TEXT NOT NULL UNIQUE,
+            search_id INTEGER, title TEXT NOT NULL, price INTEGER, location TEXT NOT NULL DEFAULT '',
+            published_at TEXT, url TEXT NOT NULL, image_url TEXT NOT NULL DEFAULT '',
+            brand TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '',
+            type TEXT NOT NULL DEFAULT 'annet', status TEXT NOT NULL DEFAULT 'ny',
+            first_seen_at TEXT NOT NULL, last_seen_at TEXT NOT NULL, inventory_id INTEGER);
+        INSERT INTO listings (finn_id, title, url, first_seen_at, last_seen_at)
+            VALUES ('1', 'Scotty Cameron oppripet', 'u', '2026-09-01', '2026-09-01');
+    """)
+    old.commit()
+    old.close()
+    app = create_app(str(path), start_scraper=False)
+    conn = sqlite3.connect(path)
+    assert conn.execute("SELECT condition FROM listings").fetchone()[0] == 1
+    assert app.test_client().get("/funn").status_code == 200
