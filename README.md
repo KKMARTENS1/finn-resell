@@ -10,7 +10,14 @@ Dette får du:
 - **Prissjekk:** sjekk om en annonse lønner seg.
 - **Markedspriser:** hva ting pleier å koste på Finn.
 
-På **Nye funn**, **Lager** og **Markedspriser** kan du bla etter **type** (putter, driver, jernsett …) og **merke**. Hver knapp viser hvor mange det er, og valgene kan kombineres, for eksempel «Putter» + «Scotty Cameron».
+På **Nye funn**, **Lager** og **Markedspriser** kan du bla etter **type** (putter, driver, jernsett …) og **merke**. Hver knapp viser hvor mange det er, og valgene kan kombineres, for eksempel «Putter» + «Scotty Cameron». Med **Sorter** kan du ordne listene etter for eksempel pris, fortjeneste eller alder.
+
+### Rydding
+
+- **Skjul alle** i Nye funn skjuler alle annonsene som vises. Filtrer for eksempel på «La være» først.
+- Under **Skjulte** kan du slette annonser én og én, eller alle som vises.
+- Golflager rydder også selv: nye funn eldre enn 30 dager skjules, og skjulte annonser eldre enn 60 dager slettes. Du kan endre dette, eller slå det av, under **Innstillinger → Rydding i Nye funn**.
+- Slettede annonser vises ikke lenger, men prisene brukes fortsatt i markedsprisene. De dukker heller ikke opp igjen som nye når scraperen ser dem på Finn.
 - **Finn-søk:** her legger du inn søkene scraperen skal følge med på.
 
 ---

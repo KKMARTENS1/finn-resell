@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, category_bar with context %}
+{% from "_macros.html" import icon, category_bar, sort_select with context %}
 {% block title %}Lager{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -21,10 +21,11 @@
     {% endfor %}
   </nav>
   <form method="get" class="inline" style="display:flex; gap:8px; flex-wrap:wrap; flex:1">
-    {% for key in ['status', 'type', 'merke'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
+    {% for key in ['status', 'type', 'merke', 'sorter'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
     <label class="visually-hidden" for="q">Søk</label>
     <input type="search" id="q" name="q" value="{{ q }}" placeholder="Søk i lageret">
   </form>
+  {{ sort_select(sorts, sort) }}
 </div>
 {{ category_bar(cat) }}
 

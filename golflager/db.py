@@ -116,6 +116,9 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "scraper_next_run": "",
     # Når brukeren sist så på "Nye funn"
     "last_seen_finds_at": "",
+    # Rydding i Nye funn (0 = aldri)
+    "auto_hide_days": 30,
+    "auto_delete_days": 60,
     # Oppdateringer fra GitHub
     "update_available": "",
     "update_checked_at": "",
@@ -136,6 +139,8 @@ LIMITS = {
     "min_comparables": (1, 50),
     "market_months": (1, 120),
     "budget_kr": (0, 10_000_000),
+    "auto_hide_days": (0, 3650),
+    "auto_delete_days": (0, 3650),
 }
 
 

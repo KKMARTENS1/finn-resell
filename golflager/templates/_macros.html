@@ -76,3 +76,13 @@
   {% endif %}
 </nav>
 {%- endmacro %}
+
+{% macro sort_select(sorts, current) -%}
+<form method="get" class="sortform">
+  {% for key, value in request.args.items() %}{% if key not in ('sorter', 'side') %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endif %}{% endfor %}
+  <label for="sorter">Sorter</label>
+  <select id="sorter" name="sorter" data-autosubmit>
+    {% for key, label in sorts %}<option value="{{ key }}" {% if current == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+</form>
+{%- endmacro %}

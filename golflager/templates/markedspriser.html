@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, category_bar with context %}
+{% from "_macros.html" import icon, category_bar, sort_select with context %}
 {% block title %}Markedspriser{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -24,7 +24,7 @@
     {% endfor %}
   </nav>
   <input type="hidden" name="gruppe" value="{{ group }}">
-  {% for key in ['type', 'merke'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
+  {% for key in ['type', 'merke', 'sorter'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
   <label class="visually-hidden" for="periode">Periode</label>
   <select id="periode" name="periode" data-autosubmit>
     {% for value, label in [(3, 'Siste 3 måneder'), (12, 'Siste 12 måneder'), (0, 'Hele perioden')] %}
@@ -39,8 +39,11 @@
 <div class="card">
   {% if table %}
     <div class="card__head">
-      <h2>{{ table|length }} {{ 'gruppe' if table|length == 1 else 'grupper' }}</h2>
-      <p>{{ total }} annonsepriser</p>
+      <div>
+        <h2>{{ table|length }} {{ 'gruppe' if table|length == 1 else 'grupper' }}</h2>
+        <p>{{ total }} annonsepriser</p>
+      </div>
+      {{ sort_select(sorts, sort) }}
     </div>
     <div class="table-wrap">
       <table>

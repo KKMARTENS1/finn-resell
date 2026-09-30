@@ -264,6 +264,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--f
 .chips__more[open] { flex-basis: 100%; }
 .chips__more[open] > summary { margin-bottom: 6px; }
 .catbar__reset { font-size: 13px; margin-left: 68px; }
+
+/* Antall, sortering og rydding over listene */
+.resultbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: -4px 0 14px; }
+.resultbar__count { color: var(--ink-2); font-size: 14px; }
+.resultbar__actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sortform { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+.sortform label { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
+.sortform select { width: auto; min-width: 0; min-height: 34px; padding: 6px 10px; font-size: 14px; }
 .seg .count { font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums; }
 
 /* ---------- Kort og paneler ---------- */

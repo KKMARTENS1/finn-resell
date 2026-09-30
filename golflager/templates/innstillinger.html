@@ -64,6 +64,14 @@
       {{ number_field('budget_kr', 'Maks penger bundet i lager', 'kr', 'Forsiden varsler deg hvis du går over. Sett 0 for å slå av.', '500') }}
     </section>
 
+    <section class="form-section" id="rydding">
+      <h2>Rydding i Nye funn</h2>
+      <div class="grid-2">
+        {{ number_field('auto_hide_days', 'Skjul nye funn etter', 'dager', 'Nye funn som er eldre enn dette, flyttes til Skjulte. 0 = aldri.') }}
+        {{ number_field('auto_delete_days', 'Slett skjulte annonser etter', 'dager', 'Slettede annonser vises ikke lenger, men prisene brukes fortsatt i markedsprisene. 0 = aldri.') }}
+      </div>
+    </section>
+
     <section class="form-section" id="scraper">
       <h2>Scraper</h2>
       <div class="grid-3">

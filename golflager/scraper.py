@@ -303,6 +303,7 @@ class ScraperWorker:
         self._manual = False
         self._only: Set[int] = set()
         self._network_failures = 0
+        self._last_cleanup = 0.0
         self._thread: Optional[threading.Thread] = None
 
     def start(self) -> None:
@@ -336,7 +337,23 @@ class ScraperWorker:
                 except sqlite3.Error:
                     pass
             self._check_for_update()
+            self._cleanup()
             self._wake.wait(20)
+
+    def _cleanup(self) -> None:
+        if self._last_cleanup and time.monotonic() - self._last_cleanup < 3600:
+            return
+        self._last_cleanup = time.monotonic()
+        from .cleanup import cleanup_listings
+
+        try:
+            conn = connect(self.db_path)
+            try:
+                cleanup_listings(conn)
+            finally:
+                conn.close()
+        except sqlite3.Error as exc:
+            log.warning("Klarte ikke å rydde i gamle annonser: %s", exc)
 
     def _check_for_update(self) -> None:
         if os.environ.get("GOLFLAGER_NO_UPDATE_CHECK"):

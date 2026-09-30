@@ -239,16 +239,48 @@ def oversikt():
 # Nye funn
 
 
-@bp.route("/funn")
-def funn():
-    conn = get_db()
+FIND_SORTS = [
+    ("nyeste", "Nyeste først"),
+    ("eldste", "Eldste først"),
+    ("pris_lav", "Lavest pris"),
+    ("pris_hoy", "Høyest pris"),
+    ("fortjeneste", "Størst fortjeneste"),
+    ("prosent", "Høyest fortjeneste i %"),
+]
+
+
+def _sort_value(value: Optional[float], descending: bool) -> Tuple[bool, float]:
+    """Sorteringsnøkkel der manglende verdier alltid havner sist."""
+    if value is None:
+        return (True, 0.0)
+    return (False, -value if descending else value)
+
+
+def sort_cards(cards: List[Dict[str, Any]], sort_key: str) -> List[Dict[str, Any]]:
+    """Kortene kommer inn med nyeste først."""
+    if sort_key == "eldste":
+        return list(reversed(cards))
+    if sort_key in ("pris_lav", "pris_hoy"):
+        return sorted(cards, key=lambda c: _sort_value(c["listing"]["price"],
+                                                       sort_key == "pris_hoy"))
+    if sort_key == "fortjeneste":
+        return sorted(cards, key=lambda c: _sort_value(c["check"].profit, True))
+    if sort_key == "prosent":
+        return sorted(cards, key=lambda c: _sort_value(c["check"].profit_pct, True))
+    return cards
+
+
+def filtered_finds(conn: sqlite3.Connection, args: Any) -> Dict[str, Any]:
+    """Annonsene som passer til valgene på Nye funn (fane, farge, søk, type, merke)."""
     settings = get_settings(conn)
-    view = request.args.get("vis", "ny")
+    view = args.get("vis", "ny")
     if view not in LISTING_STATUSES:
         view = "ny"
-    color = request.args.get("farge", "")
-    search_filter = parse_int(request.args.get("sok"))
-    page = max(1, parse_int(request.args.get("side")) or 1)
+    color = args.get("farge", "")
+    search_filter = parse_int(args.get("sok"))
+    sort_key = args.get("sorter", "nyeste")
+    if sort_key not in dict(FIND_SORTS):
+        sort_key = "nyeste"
 
     query = """SELECT l.*, s.name AS search_name FROM listings l
                LEFT JOIN searches s ON s.id = l.search_id WHERE l.status = ?"""
@@ -278,8 +310,21 @@ def funn():
         if color and card["check"].color != color:
             continue
         cards.append(card)
-    total = len(cards)
-    cards = cards[(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
+    return {
+        "view": view, "color": color, "search_filter": search_filter, "sort": sort_key,
+        "cards": sort_cards(cards, sort_key), "counts": counts, "cat": facets,
+        "settings": settings,
+    }
+
+
+@bp.route("/funn")
+def funn():
+    conn = get_db()
+    found = filtered_finds(conn, request.args)
+    settings, view = found["settings"], found["view"]
+    page = max(1, parse_int(request.args.get("side")) or 1)
+    total = len(found["cards"])
+    cards = found["cards"][(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
 
     previous_seen = settings["last_seen_finds_at"] or "0000"
     if view == "ny":
@@ -293,10 +338,12 @@ def funn():
     return render_template(
         "funn.html",
         cards=cards,
-        counts=counts,
+        counts=found["counts"],
         view=view,
-        color=color,
-        search_filter=search_filter,
+        color=found["color"],
+        search_filter=found["search_filter"],
+        sort=found["sort"],
+        sorts=FIND_SORTS,
         searches=searches,
         previous_seen=previous_seen,
         page=page,
@@ -304,8 +351,33 @@ def funn():
         total=total,
         tab_counts=tab_counts,
         brands=known_values(conn, "brand"),
-        cat=facets,
+        cat=found["cat"],
     )
+
+
+@bp.route("/funn/rydd", methods=["POST"])
+def funn_rydd():
+    """Skjul eller slett alle annonsene som vises med valgene du har nå."""
+    conn = get_db()
+    action = request.form.get("handling")
+    found = filtered_finds(conn, request.args)
+    ids = [card["listing"]["id"] for card in found["cards"]]
+    if action == "skjul" and found["view"] == "ny":
+        new_status, verb = "skjult", "skjult"
+    elif action == "slett" and found["view"] == "skjult":
+        new_status, verb = "slettet", "slettet"
+    else:
+        abort(400)
+    for start in range(0, len(ids), 500):
+        chunk = ids[start:start + 500]
+        conn.execute(
+            f"UPDATE listings SET status = ? WHERE id IN ({', '.join('?' * len(chunk))})",
+            [new_status] + chunk,
+        )
+    log_event(conn, "info", f"{len(ids)} annonser ble {verb} fra Nye funn.")
+    conn.commit()
+    flash(f"{len(ids)} {'annonse' if len(ids) == 1 else 'annonser'} er {verb}.", "ok")
+    return redirect(url_for("main.funn", **request.args.to_dict()))
 
 
 def _listing_or_404(conn: sqlite3.Connection, listing_id: int) -> sqlite3.Row:
@@ -352,6 +424,15 @@ def funn_skjul(listing_id: int):
     return redirect(safe_next(url_for("main.funn")))
 
 
+@bp.route("/funn/<int:listing_id>/slett", methods=["POST"])
+def funn_slett(listing_id: int):
+    conn = get_db()
+    _listing_or_404(conn, listing_id)
+    conn.execute("UPDATE listings SET status = 'slettet' WHERE id = ?", (listing_id,))
+    conn.commit()
+    return redirect(safe_next(url_for("main.funn")))
+
+
 @bp.route("/funn/<int:listing_id>/vis", methods=["POST"])
 def funn_vis(listing_id: int):
     conn = get_db()
@@ -386,6 +467,39 @@ def funn_rett(listing_id: int):
 # Lager
 
 
+LAGER_SORTS = [
+    ("status", "Status"),
+    ("nyeste", "Nyeste først"),
+    ("eldste", "Eldste først"),
+    ("kostnad", "Høyest kostnad"),
+    ("fortjeneste", "Størst fortjeneste"),
+    ("dager", "Flest dager"),
+    ("merke", "Merke A–Å"),
+]
+STATUS_ORDER = {"vurderes": 0, "kjopt": 1, "klargjores": 2, "til_salgs": 3, "solgt": 4}
+
+
+def _item_date(item: Dict[str, Any]) -> int:
+    value = item["sale_date"] or item["purchase_date"] or item["created_at"][:10]
+    return datetime.fromisoformat(value[:10]).toordinal()
+
+
+def sort_items(items: List[Dict[str, Any]], sort_key: str) -> List[Dict[str, Any]]:
+    if sort_key == "nyeste":
+        return sorted(items, key=lambda i: -_item_date(i))
+    if sort_key == "eldste":
+        return sorted(items, key=_item_date)
+    if sort_key == "kostnad":
+        return sorted(items, key=lambda i: -i["cost"])
+    if sort_key == "fortjeneste":
+        return sorted(items, key=lambda i: _sort_value(i["profit"], True))
+    if sort_key == "dager":
+        return sorted(items, key=lambda i: _sort_value(i["days"], True))
+    if sort_key == "merke":
+        return sorted(items, key=lambda i: (i["brand"].lower(), i["model"].lower()))
+    return sorted(items, key=lambda i: (STATUS_ORDER.get(i["status"], 9), -_item_date(i)))
+
+
 @bp.route("/lager")
 def lager():
     conn = get_db()
@@ -403,17 +517,15 @@ def lager():
     if text:
         query += " AND (brand LIKE ? OR model LIKE ? OR notes LIKE ?)"
         params.extend([f"%{text}%"] * 3)
-    order = {"vurderes": 0, "kjopt": 1, "klargjores": 2, "til_salgs": 3, "solgt": 4}
+    sort_key = request.args.get("sorter", "status")
+    if sort_key not in dict(LAGER_SORTS):
+        sort_key = "status"
     all_items = [enrich_item(dict(r)) for r in conn.execute(query, params)]
     facets = category_facets(all_items, lambda i: i["type"], lambda i: i["brand"],
                              selected_type, selected_brand)
     items = [i for i in all_items
              if in_category(i["type"], i["brand"], selected_type, selected_brand)]
-    items.sort(key=lambda i: (
-        order.get(i["status"], 9),
-        -(datetime.fromisoformat(i["sale_date"] or i["purchase_date"] or i["created_at"][:10])
-          .toordinal()),
-    ))
+    items = sort_items(items, sort_key)
     counts = {key: 0 for key, _ in STATUSES}
     for row in conn.execute("SELECT status, COUNT(*) AS n FROM inventory GROUP BY status"):
         counts[row["status"]] = row["n"]
@@ -423,7 +535,7 @@ def lager():
         "profit": sum(i["profit"] or 0 for i in items if i["profit"] is not None),
     }
     return render_template("lager.html", items=items, status=status, q=text, counts=counts,
-                           totals=totals, cat=facets,
+                           totals=totals, cat=facets, sort=sort_key, sorts=LAGER_SORTS,
                            filtered=bool(status or text or selected_type or selected_brand))
 
 
@@ -626,6 +738,14 @@ def percentile(values: List[int], fraction: float) -> float:
     return ordered[low] + (ordered[high] - ordered[low]) * (position - low)
 
 
+MARKET_SORTS = [
+    ("antall", "Flest annonser"),
+    ("pris_lav", "Lavest typisk pris"),
+    ("pris_hoy", "Høyest typisk pris"),
+    ("merke", "Merke A–Å"),
+]
+
+
 @bp.route("/markedspriser")
 def markedspriser():
     conn = get_db()
@@ -690,10 +810,21 @@ def markedspriser():
             "own": median(own[key]) if key in own else None,
             "own_count": len(own.get(key, [])),
         })
-    table.sort(key=lambda r: (-r["count"], r["brand"].lower(), (r["model"] or "").lower()))
+    sort_key = request.args.get("sorter", "antall")
+    if sort_key not in dict(MARKET_SORTS):
+        sort_key = "antall"
+    by_name = lambda r: (r["brand"].lower(), (r["model"] or "").lower(), r["type"])  # noqa: E731
+    if sort_key == "pris_lav":
+        table.sort(key=lambda r: (r["median"], by_name(r)))
+    elif sort_key == "pris_hoy":
+        table.sort(key=lambda r: (-r["median"], by_name(r)))
+    elif sort_key == "merke":
+        table.sort(key=by_name)
+    else:
+        table.sort(key=lambda r: (-r["count"], by_name(r)))
     return render_template("markedspriser.html", table=table, group=group,
                            q=request.args.get("q", ""), months=months, total=len(rows),
-                           cat=facets)
+                           cat=facets, sort=sort_key, sorts=MARKET_SORTS)
 
 
 # ---------------------------------------------------------------------------
@@ -893,7 +1024,7 @@ def api_status():
 SETTING_FIELDS = [
     "min_profit_pct", "min_profit_kr", "sale_factor_pct", "default_extra_cost",
     "cond_value_5", "cond_value_4", "cond_value_2", "cond_value_1",
-    "min_comparables", "market_months", "budget_kr",
+    "min_comparables", "market_months", "budget_kr", "auto_hide_days", "auto_delete_days",
     "scrape_interval_min", "page_delay_s", "pages_per_search",
 ]
 

@@ -82,3 +82,22 @@ def add_search(conn, url="https://www.finn.no/recommerce/forsale/search?q=scotty
     )
     conn.commit()
     return cursor.lastrowid
+
+
+@pytest.fixture
+def filled(conn):
+    add_search(conn)
+    add_item(conn, status="solgt", purchase_price=1500, sale_price=3000,
+             purchase_date="2026-02-01", sale_date="2026-02-21", cost_grip=150)
+    add_item(conn, brand="Ping", model="G425", type="driver", status="solgt",
+             purchase_price=2500, sale_price=2300, purchase_date="2026-03-01",
+             sale_date="2026-04-01")
+    add_item(conn, brand="Titleist", model="T100", type="jernsett", status="til_salgs",
+             purchase_price=6000, listed_price=8000)
+    add_item(conn, brand="Odyssey", model="#7", status="vurderes", purchase_price=None,
+             purchase_date=None)
+    for i, price in enumerate([2800, 3000, 3200]):
+        add_listing(conn, 100 + i, f"Scotty Cameron Newport 2 nr {i}", price, "Scotty Cameron",
+                    "Newport 2", "putter")
+    add_listing(conn, 200, "Ping Anser putter", 900, "Ping", "Anser", "putter")
+    return conn

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import flag, icon, category_bar with context %}
+{% from "_macros.html" import flag, icon, category_bar, sort_select with context %}
 {% block title %}Nye funn{% endblock %}
 {% block content %}
 {% set here = request.full_path %}
@@ -27,7 +27,7 @@
   </nav>
   {% if searches|length > 1 %}
     <form method="get" class="inline">
-      {% for key in ['vis', 'farge', 'type', 'merke'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
+      {% for key in ['vis', 'farge', 'type', 'merke', 'sorter'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
       <label class="visually-hidden" for="sok">Søk</label>
       <select id="sok" name="sok" data-autosubmit>
         <option value="">Alle søk</option>
@@ -37,6 +37,28 @@
   {% endif %}
 </div>
 {{ category_bar(cat) }}
+
+{% if total or tab_counts[view] %}
+  <div class="resultbar">
+    <p class="resultbar__count"><strong>{{ total }}</strong> {{ 'annonse' if total == 1 else 'annonser' }}</p>
+    <div class="resultbar__actions">
+      {{ sort_select(sorts, sort) }}
+      {% if view == 'ny' and total %}
+        <form method="post" action="{{ url_for('main.funn_rydd', **request.args.to_dict()) }}"
+              data-confirm="Skjule alle {{ total }} annonsene som vises nå? Du finner dem igjen under Skjulte.">
+          <input type="hidden" name="handling" value="skjul">
+          <button class="btn btn--small" type="submit">Skjul alle {{ total }}</button>
+        </form>
+      {% elif view == 'skjult' and total %}
+        <form method="post" action="{{ url_for('main.funn_rydd', **request.args.to_dict()) }}"
+              data-confirm="Slette alle {{ total }} annonsene som vises nå? De kan ikke hentes tilbake. Prisene brukes fortsatt i markedsprisene.">
+          <input type="hidden" name="handling" value="slett">
+          <button class="btn btn--small btn--danger" type="submit">Slett alle {{ total }}</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
 
 {% if not cards %}
   <div class="card empty">
@@ -129,6 +151,10 @@
                 <form class="inline" method="post" action="{{ url_for('main.funn_vis', listing_id=l.id) }}">
                   <input type="hidden" name="next" value="{{ here }}">
                   <button class="btn" type="submit">Vis igjen</button>
+                </form>
+                <form class="inline" method="post" action="{{ url_for('main.funn_slett', listing_id=l.id) }}">
+                  <input type="hidden" name="next" value="{{ here }}">
+                  <button class="btn btn--danger" type="submit" title="Fjern annonsen for godt">Slett</button>
                 </form>
               {% else %}
                 <form class="inline" method="post" action="{{ url_for('main.funn_skjul', listing_id=l.id) }}">
