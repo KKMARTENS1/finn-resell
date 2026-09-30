@@ -99,11 +99,17 @@ Du slår scraperen av og på under **Finn-søk**.
 
 ## Oppdatere til en ny versjon
 
-1. Stopp appen: **Innstillinger → Slå av Golflager** (eller `Ctrl + C` hvis du startet den i Terminal).
-2. Last ned ZIP-filen på nytt fra GitHub (**Code → Download ZIP**), og bytt ut den gamle mappen med den nye.
-3. Åpne Terminal og kjør `bash start.sh` fra den nye mappen én gang (se «Første gang»). Da blir ikonet oppdatert. Første oppstart etter en oppdatering tar et minutt eller to.
+Golflager ser selv etter nye versjoner et par ganger om dagen. Når det finnes en, dukker det opp en grønn melding med knappen **Oppdater nå**. Trykk på den, så gjør appen resten:
+
+1. Laster ned den nye versjonen fra GitHub.
+2. Prøvekjører den på en kopi av dataene dine. Hvis noe er galt, stopper den og endrer ingenting.
+3. Tar vare på den gamle versjonen i `~/Golflager/forrige-versjon`, bytter til den nye og starter på nytt.
+
+Du kan også se etter oppdatering selv under **Innstillinger → Oppdatering**.
 
 Søkene, lageret og innstillingene dine ligger i `~/Golflager` og blir med over av seg selv.
+
+Oppdateringsknappen krever at GitHub-prosjektet er offentlig. Virker den ikke, kan du alltid oppdatere for hånd: last ned ZIP-filen på nytt, bytt ut mappen og kjør `bash start.sh` én gang (se «Første gang»).
 
 ---
 

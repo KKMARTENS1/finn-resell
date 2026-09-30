@@ -22,6 +22,17 @@
     });
   });
 
+  // Knapper som tar litt tid (oppdatering): vis at noe skjer
+  document.querySelectorAll("form[data-busy]").forEach(function (form) {
+    form.addEventListener("submit", function () {
+      document.querySelectorAll("button").forEach(function (button) {
+        if (button.form !== form) return;
+        button.disabled = true;
+        button.textContent = form.getAttribute("data-busy");
+      });
+    });
+  });
+
   // Verktøytips på grafene
   var tip = document.getElementById("tooltip");
   function showTip(el) {

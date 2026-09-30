@@ -7,6 +7,7 @@ import re
 import sqlite3
 import tempfile
 from datetime import datetime, timedelta
+from pathlib import Path
 from statistics import median
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlsplit
@@ -14,7 +15,7 @@ from urllib.parse import urlsplit
 from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, render_template,
                    request, send_file, url_for)
 
-from . import stats
+from . import stats, updater
 from .classify import normalize
 from .constants import (CONDITION_LABELS, CONDITIONS, IN_STOCK, LISTING_STATUSES, STATUS_LABELS,
                         STATUSES, TYPE_LABELS, TYPES, VERDICTS)
@@ -77,6 +78,11 @@ def inject_common() -> Dict[str, Any]:
         "CONDITION_LABELS": CONDITION_LABELS,
         "VERDICTS": VERDICTS,
         "rule_text": rule_text(settings),
+        "app_version": current_app.config.get("VERSION", "0"),
+        "update_version": (settings["update_available"]
+                           if updater.is_newer(settings["update_available"],
+                                               current_app.config.get("VERSION", "0"))
+                           else ""),
     }
 
 
@@ -736,6 +742,41 @@ def avslutt():
     return render_template("avsluttet.html", stopped=shutdown is not None)
 
 
+@bp.route("/oppdater", methods=["POST"])
+def oppdater():
+    shutdown = current_app.config.get("SHUTDOWN")
+    try:
+        version = updater.install_latest(current_app.config["DATABASE"])
+    except updater.UpdateError as exc:
+        flash(str(exc), "feil")
+        return redirect(url_for("main.innstillinger", _anchor="oppdatering"))
+    conn = get_db()
+    log_event(conn, "info", f"Golflager ble oppdatert til versjon {version}.")
+    conn.commit()
+    if shutdown is None:
+        flash(f"Versjon {version} er installert. Start Golflager på nytt for å ta den i bruk.", "ok")
+        return redirect(url_for("main.innstillinger", _anchor="oppdatering"))
+    log_file = Path(current_app.config["DATABASE"]).parent / "golflager.log"
+    updater.restart(log_path=log_file)
+    shutdown()
+    return render_template("oppdaterer.html", version=version)
+
+
+@bp.route("/oppdater/sjekk", methods=["POST"])
+def oppdater_sjekk():
+    conn = get_db()
+    try:
+        version = updater.check_for_update(conn, force=True)
+    except updater.UpdateError as exc:
+        flash(str(exc), "feil")
+    else:
+        if version:
+            flash(f"Versjon {version} er klar.", "ok")
+        else:
+            flash("Du har nyeste versjon.", "ok")
+    return redirect(url_for("main.innstillinger", _anchor="oppdatering"))
+
+
 @bp.route("/api/status")
 def api_status():
     conn = get_db()
@@ -745,6 +786,7 @@ def api_status():
         (settings["last_seen_finds_at"] or "0000",),
     ).fetchone()[0]
     return jsonify(
+        version=current_app.config.get("VERSION", "0"),
         running=worker().running,
         enabled=bool(settings["scraper_enabled"]),
         error=settings["scraper_error"],

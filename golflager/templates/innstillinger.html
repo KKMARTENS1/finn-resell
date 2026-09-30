@@ -90,6 +90,17 @@
       <a class="btn" href="{{ url_for('main.sikkerhetskopi') }}">Last ned sikkerhetskopi</a>
       <p class="hint">Ta gjerne en kopi av og til, og legg den i iCloud eller på en minnepinne.</p>
     </div>
+    <div class="card" id="oppdatering">
+      <h2 style="margin-bottom:8px">Oppdatering</h2>
+      <p class="small">Du har versjon <strong>{{ app_version }}</strong>.</p>
+      {% if update_version %}
+        <p class="small" style="margin-top:6px">Versjon <strong>{{ update_version }}</strong> er klar. Oppdateringen tar under et minutt, og dataene dine blir med.</p>
+        <button class="btn btn--primary" type="submit" form="oppdater-form" style="margin-top:12px">{{ icon('refresh', 16) }}Oppdater nå</button>
+      {% else %}
+        <p class="small muted" style="margin-top:6px">Golflager ser selv etter nye versjoner.{% if settings.update_checked_at %} Sist sjekket {{ settings.update_checked_at|tid_siden }}.{% endif %}</p>
+        <button class="btn" type="submit" form="sjekk-form" style="margin-top:12px">{{ icon('refresh', 16) }}Se etter oppdatering</button>
+      {% endif %}
+    </div>
     <div class="card">
       <h2 style="margin-bottom:8px">Slå av Golflager</h2>
       <p class="small">Golflager kjører i bakgrunnen og sjekker Finn til du slår av Macen eller trykker her. Du starter den igjen med Golflager-ikonet i Dock.</p>
@@ -97,6 +108,8 @@
     </div>
   </aside>
 </form>
+<form id="oppdater-form" method="post" action="{{ url_for('main.oppdater') }}" data-busy="Oppdaterer …"></form>
+<form id="sjekk-form" method="post" action="{{ url_for('main.oppdater_sjekk') }}" data-busy="Sjekker …"></form>
 <form id="avslutt-form" method="post" action="{{ url_for('main.avslutt') }}"
       data-confirm="Slå av Golflager? Scraperen slutter å sjekke Finn til du starter Golflager igjen."></form>
 {% endblock %}

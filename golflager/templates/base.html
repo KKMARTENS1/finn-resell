@@ -55,6 +55,17 @@
         <a class="btn btn--small" href="{{ url_for('main.sok') }}">Gå til Finn-søk</a>
       </div>
     {% endif %}
+    {% if update_version and endpoint != 'main.innstillinger' %}
+      <div class="banner banner--go">
+        {{ icon('refresh', 20) }}
+        <div>
+          <p><strong>En ny versjon av Golflager er klar.</strong> Oppdateringen tar under et minutt, og dataene dine blir med.</p>
+        </div>
+        <form method="post" action="{{ url_for('main.oppdater') }}" data-busy="Oppdaterer …">
+          <button class="btn btn--small btn--primary" type="submit">Oppdater nå</button>
+        </form>
+      </div>
+    {% endif %}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <div class="flashes" role="status">

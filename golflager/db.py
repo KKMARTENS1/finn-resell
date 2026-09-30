@@ -116,6 +116,9 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "scraper_next_run": "",
     # Når brukeren sist så på "Nye funn"
     "last_seen_finds_at": "",
+    # Oppdateringer fra GitHub
+    "update_available": "",
+    "update_checked_at": "",
 }
 
 LIMITS = {

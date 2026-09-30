@@ -21,6 +21,9 @@ def create_app(database: Optional[str] = None, start_scraper: bool = True) -> Fl
     finally:
         conn.close()
     app.config["TEMPLATES_AUTO_RELOAD"] = False
+    from .updater import local_version
+
+    app.config["VERSION"] = local_version()
 
     from .scraper import ScraperWorker
     from .views import bp

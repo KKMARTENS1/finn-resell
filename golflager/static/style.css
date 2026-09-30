@@ -177,7 +177,7 @@ p { margin: 0; }
 .banner--go svg { color: var(--go); }
 .banner--info { background: var(--surface); border-color: var(--line); }
 .banner--info svg { color: var(--series-1); }
-.banner .btn { margin-left: auto; flex: none; }
+.banner .btn, .banner form { margin-left: auto; flex: none; }
 
 .flashes { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
 .flash { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 14px; border: 1px solid var(--line); background: var(--surface); }

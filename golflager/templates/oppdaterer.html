@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Oppdaterer · Golflager</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="main" style="margin:0 auto; max-width:620px">
+  <div class="card" style="margin-top:48px; text-align:center; padding:36px 28px">
+    <svg width="56" height="56" viewBox="0 0 32 32" aria-hidden="true" style="margin-bottom:14px">
+      <rect width="32" height="32" rx="8" fill="#133d2b"/>
+      <path d="M11 6v21" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M12.5 7 24 11l-11.5 4z" fill="#f2c230"/>
+    </svg>
+    <h1 id="tittel">Oppdaterer til versjon {{ version }} …</h1>
+    <p id="tekst" style="margin:12px auto 0; max-width:44ch; color:var(--ink-2)">Golflager starter på nytt. Siden åpner seg av seg selv om noen sekunder.</p>
+  </div>
+</main>
+<script>
+(function () {
+  var wanted = {{ version|tojson }};
+  var started = Date.now();
+  function poll() {
+    fetch("/api/status", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.version === wanted) { window.location.href = "/"; return; }
+        again();
+      })
+      .catch(again);
+  }
+  function again() {
+    if (Date.now() - started > 180000) {
+      document.getElementById("tittel").textContent = "Dette tar lengre tid enn vanlig";
+      document.getElementById("tekst").textContent =
+        "Klikk på Golflager-ikonet i Dock for å starte appen. Står det en feilmelding, send den til den som laget appen.";
+      return;
+    }
+    setTimeout(poll, 1500);
+  }
+  setTimeout(poll, 2500);
+})();
+</script>
+</body>
+</html>

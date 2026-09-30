@@ -10,6 +10,7 @@ Regler den følger:
 from __future__ import annotations
 
 import logging
+import os
 import random
 import re
 import sqlite3
@@ -334,7 +335,22 @@ class ScraperWorker:
                     conn.close()
                 except sqlite3.Error:
                     pass
+            self._check_for_update()
             self._wake.wait(20)
+
+    def _check_for_update(self) -> None:
+        if os.environ.get("GOLFLAGER_NO_UPDATE_CHECK"):
+            return
+        from .updater import UpdateError, check_for_update
+
+        try:
+            conn = connect(self.db_path)
+            try:
+                check_for_update(conn)
+            finally:
+                conn.close()
+        except (UpdateError, sqlite3.Error, ValueError) as exc:
+            log.info("Fant ikke ut om det finnes en ny versjon: %s", exc)
 
     def tick(self, now: Optional[datetime] = None) -> None:
         conn = connect(self.db_path)
