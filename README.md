@@ -21,17 +21,25 @@ Dette får du:
 2. **Åpne Terminal.** Trykk `Cmd + mellomrom`, skriv `Terminal` og trykk Enter.
 3. **Start appen.** Skriv `bash ` (med mellomrom etter), dra filen **start.sh** fra mappen inn i Terminal-vinduet, og trykk Enter.
 4. Hvis Macen spør om å installere **utviklerverktøy** («command line developer tools»), trykk **Installer** og vent til det er ferdig. Gjør så steg 3 én gang til.
-5. Første oppstart tar et minutt eller to. Så åpner appen seg i nettleseren på **http://localhost:8000**.
+5. Første oppstart tar et minutt eller to. Så åpner appen seg i nettleseren, og **Golflager-ikonet** (et gult flagg på grønn bakgrunn) legges i Dock.
 
-### Senere
+### Senere: klikk på ikonet
 
-Gjør steg 2 og 3 igjen. Da starter appen på noen sekunder.
+Klikk på **Golflager-ikonet i Dock**. Appen starter i bakgrunnen og åpner seg i nettleseren. Du trenger ikke Terminal lenger.
 
-Du kan også dobbeltklikke **Start.command** i mappen. Første gang må du høyreklikke den og velge **Åpne**, fordi Macen ikke kjenner filen fra før.
+- Ikonet ligger også i **Programmer**. Du finner det med `Cmd + mellomrom` ved å skrive **Golflager**.
+- Kjører Golflager allerede, åpner ikonet bare nettleseren.
+- Første gang du klikker på ikonet, kan Macen spørre om Golflager får tilgang til mappen der appen ligger (for eksempel Dokumenter). Trykk **OK**.
 
 ### Stoppe
 
-Trykk `Ctrl + C` i Terminal-vinduet, eller lukk vinduet. Terminal-vinduet må stå åpent så lenge du bruker appen.
+Golflager kjører i bakgrunnen og sjekker Finn til du slår av Macen. Vil du stoppe den før det, gå til **Innstillinger** og trykk **Slå av Golflager**.
+
+Har du startet med `bash start.sh` i Terminal, kan du også trykke `Ctrl + C` der.
+
+### Hvis du flytter mappen
+
+Ikonet husker hvor Golflager-mappen ligger. Flytter du mappen, eller laster ned en ny versjon til et annet sted, kjører du `bash start.sh` fra den nye mappen én gang. Da blir ikonet oppdatert.
 
 ---
 
@@ -91,9 +99,9 @@ Du slår scraperen av og på under **Finn-søk**.
 
 ## Oppdatere til en ny versjon
 
-1. Stopp appen (`Ctrl + C` i Terminal).
+1. Stopp appen: **Innstillinger → Slå av Golflager** (eller `Ctrl + C` hvis du startet den i Terminal).
 2. Last ned ZIP-filen på nytt fra GitHub (**Code → Download ZIP**), og bytt ut den gamle mappen med den nye.
-3. Start appen som vanlig. Første oppstart etter en oppdatering tar et minutt eller to.
+3. Åpne Terminal og kjør `bash start.sh` fra den nye mappen én gang (se «Første gang»). Da blir ikonet oppdatert. Første oppstart etter en oppdatering tar et minutt eller to.
 
 Søkene, lageret og innstillingene dine ligger i `~/Golflager` og blir med over av seg selv.
 

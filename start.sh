@@ -37,5 +37,10 @@ if [ ! -f ".venv/.installert" ] || [ "$(cat .venv/.installert)" != "$WANTED" ]; 
   echo "$WANTED" > .venv/.installert
 fi
 
-# 4. Start
+# 4. Lag Golflager-ikonet i Programmer og Dock (bare når du starter fra Terminal på en Mac)
+if [ -z "$GOLFLAGER_FRA_APP" ] && { [ "$(uname)" = "Darwin" ] || [ -n "$GOLFLAGER_FORCE_APP" ]; }; then
+  bash mac/lag-app.sh "$PWD" || echo "  (Klarte ikke å lage Golflager-ikonet. Appen virker likevel.)"
+fi
+
+# 5. Start
 exec .venv/bin/python run.py

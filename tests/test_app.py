@@ -274,3 +274,13 @@ def test_old_database_gets_condition_column(tmp_path):
     conn = sqlite3.connect(path)
     assert conn.execute("SELECT condition FROM listings").fetchone()[0] == 1
     assert app.test_client().get("/funn").status_code == 200
+
+
+def test_shutdown_button(app, client):
+    calls = []
+    assert "Kjører fortsatt".lower() in client.post("/avslutt").get_data(as_text=True).lower()
+    app.config["SHUTDOWN"] = lambda: calls.append(True)
+    html = client.post("/avslutt").get_data(as_text=True)
+    assert "Golflager er slått av" in html
+    assert calls == [True]
+    assert "Slå av Golflager" in client.get("/innstillinger").get_data(as_text=True)

@@ -726,6 +726,16 @@ def scraper_sjekk():
     return redirect(url_for("main.sok"))
 
 
+@bp.route("/avslutt", methods=["POST"])
+def avslutt():
+    shutdown = current_app.config.get("SHUTDOWN")
+    if shutdown is not None:
+        log_event(get_db(), "info", "Golflager ble slått av.")
+        get_db().commit()
+        shutdown()
+    return render_template("avsluttet.html", stopped=shutdown is not None)
+
+
 @bp.route("/api/status")
 def api_status():
     conn = get_db()

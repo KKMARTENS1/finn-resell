@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="no">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slått av · Golflager</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="main" style="margin:0 auto; max-width:620px">
+  <div class="card" style="margin-top:48px; text-align:center; padding:36px 28px">
+    <svg width="56" height="56" viewBox="0 0 32 32" aria-hidden="true" style="margin-bottom:14px">
+      <rect width="32" height="32" rx="8" fill="#133d2b"/>
+      <path d="M11 6v21" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M12.5 7 24 11l-11.5 4z" fill="#f2c230"/>
+    </svg>
+    {% if stopped %}
+      <h1>Golflager er slått av</h1>
+      <p style="margin:12px auto 0; max-width:42ch; color:var(--ink-2)">Du kan lukke denne fanen. Start Golflager igjen med ikonet i Dock når du vil bruke den.</p>
+    {% else %}
+      <h1>Golflager kjører fortsatt</h1>
+      <p style="margin:12px auto 0; max-width:42ch; color:var(--ink-2)">Denne versjonen ble startet på en måte som ikke kan slås av herfra. Lukk Terminal-vinduet for å stoppe den.</p>
+      <p style="margin-top:18px"><a class="btn" href="{{ url_for('main.oversikt') }}">Tilbake til Oversikt</a></p>
+    {% endif %}
+  </div>
+</main>
+</body>
+</html>

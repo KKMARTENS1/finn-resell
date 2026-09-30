@@ -1,0 +1,66 @@
+#!/bin/bash
+# Programmet bak Golflager-ikonet: starter Golflager i bakgrunnen og åpner den i nettleseren.
+# Kjører den allerede, åpnes bare nettleseren.
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+APP_DIR="$(cat "$HERE/Resources/mappe.txt" 2>/dev/null)"
+DATA_DIR="${GOLFLAGER_DATA_DIR:-$HOME/Golflager}"
+URL_FILE="$DATA_DIR/server.url"
+LOG="$DATA_DIR/golflager.log"
+LOCK="$DATA_DIR/starter.pid"
+
+melding() {
+  osascript -e "display notification \"$1\" with title \"Golflager\"" >/dev/null 2>&1
+}
+feil() {
+  local tekst
+  tekst="$(printf '%s' "$1" | tr '\n"\\' " ' " | tr -s ' ')"
+  osascript -e "display alert \"Golflager kunne ikke starte\" message \"$tekst\" as critical" >/dev/null 2>&1
+}
+kjorer() {
+  [ -f "$URL_FILE" ] && curl -s -m 2 -o /dev/null "$(cat "$URL_FILE")/api/status"
+}
+
+# 1. Kjører den allerede? Da åpner vi bare nettleseren.
+if kjorer; then
+  open "$(cat "$URL_FILE")"
+  exit 0
+fi
+
+# 2. Holder den på å starte fra før (dobbeltklikk)?
+if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK")" 2>/dev/null; then
+  melding "Golflager holder på å starte …"
+  exit 0
+fi
+
+if [ -z "$APP_DIR" ] || [ ! -f "$APP_DIR/start.sh" ]; then
+  feil "Fant ikke Golflager-mappen (${APP_DIR:-ukjent}). Har du flyttet eller slettet den? Åpne Terminal og kjør bash start.sh fra mappen der Golflager ligger nå. Da blir ikonet oppdatert."
+  exit 1
+fi
+
+# 3. Start i bakgrunnen
+mkdir -p "$DATA_DIR"
+rm -f "$URL_FILE"
+cd "$APP_DIR" || exit 1
+GOLFLAGER_FRA_APP=1 nohup bash start.sh > "$LOG" 2>&1 &
+PID=$!
+echo "$PID" > "$LOCK"
+melding "Starter Golflager … Første gang kan det ta et par minutter."
+
+# 4. Vent til den svarer. Stopper den underveis, viser vi hva som gikk galt.
+for _ in $(seq 1 300); do
+  if kjorer; then
+    rm -f "$LOCK"
+    exit 0  # Golflager åpner nettleseren selv
+  fi
+  if ! kill -0 "$PID" 2>/dev/null; then
+    rm -f "$LOCK"
+    feil "$(grep -v '^[[:space:]]*$' "$LOG" | tail -n 4)"
+    exit 1
+  fi
+  sleep 1
+done
+rm -f "$LOCK"
+feil "Golflager brukte for lang tid på å starte. Se loggen i $LOG"
+exit 1
