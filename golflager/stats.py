@@ -124,10 +124,12 @@ def dashboard(conn: sqlite3.Connection, settings: Dict[str, Any]) -> Dict[str, A
     def ranking(key: str, label_map: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
         groups: Dict[str, Dict[str, Any]] = {}
         for item in sold:
-            name = item[key] or "Ukjent"
+            raw = item[key] or ""
+            name = raw or "Ukjent merke"
             if label_map:
-                name = label_map.get(name, name)
-            group = groups.setdefault(name, {"name": name, "profit": 0, "count": 0})
+                name = label_map.get(raw, name)
+            group = groups.setdefault(name, {"name": name, "key": raw or name, "profit": 0,
+                                             "count": 0})
             group["profit"] += item_profit(item) or 0
             group["count"] += 1
         rows = sorted(groups.values(), key=lambda g: g["profit"], reverse=True)[:6]
@@ -142,7 +144,7 @@ def dashboard(conn: sqlite3.Connection, settings: Dict[str, Any]) -> Dict[str, A
         sold_n = sum(1 for i in sold if i["type"] == type_key)
         stock_n = sum(1 for i in in_stock if i["type"] == type_key)
         if sold_n or stock_n:
-            type_rows.append({"label": label, "sold": sold_n, "stock": stock_n,
+            type_rows.append({"key": type_key, "label": label, "sold": sold_n, "stock": stock_n,
                               "total": sold_n + stock_n})
     biggest_type = max([r["total"] for r in type_rows] + [1])
     for row in type_rows:

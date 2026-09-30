@@ -40,3 +40,39 @@
   {% if hint %}<div class="hint">{{ hint }}</div>{% endif %}
 </div>
 {%- endmacro %}
+
+{% macro category_bar(cat) -%}
+<nav class="catbar" aria-label="Kategorier">
+  <div class="catbar__row">
+    <span class="catbar__label">Type</span>
+    <div class="chips">
+      <a class="chip-link" href="{{ url_with(type=None) }}" {% if not cat.type %}aria-current="true"{% endif %}>Alle <span class="count">{{ cat.type_total }}</span></a>
+      {% for t in cat.types %}
+        <a class="chip-link" href="{{ url_with(type=t.key) }}" {% if cat.type == t.key %}aria-current="true"{% endif %}>{{ t.label }} <span class="count">{{ t.count }}</span></a>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="catbar__row">
+    <span class="catbar__label">Merke</span>
+    <div class="chips">
+      <a class="chip-link" href="{{ url_with(merke=None) }}" {% if not cat.brand %}aria-current="true"{% endif %}>Alle merker <span class="count">{{ cat.brand_total }}</span></a>
+      {% for b in cat.brands %}
+        <a class="chip-link" href="{{ url_with(merke=b.label) }}" {% if cat.brand == b.key %}aria-current="true"{% endif %}>{{ b.label }} <span class="count">{{ b.count }}</span></a>
+      {% endfor %}
+      {% if cat.more_brands %}
+        <details class="chips__more">
+          <summary class="chip-link">Flere merker ({{ cat.more_brands|length }})</summary>
+          <div class="chips">
+            {% for b in cat.more_brands %}
+              <a class="chip-link" href="{{ url_with(merke=b.label) }}">{{ b.label }} <span class="count">{{ b.count }}</span></a>
+            {% endfor %}
+          </div>
+        </details>
+      {% endif %}
+    </div>
+  </div>
+  {% if cat.type or cat.brand %}
+    <a class="catbar__reset" href="{{ url_with(type=None, merke=None) }}">Vis alle typer og merker</a>
+  {% endif %}
+</nav>
+{%- endmacro %}

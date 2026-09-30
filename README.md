@@ -9,6 +9,8 @@ Dette får du:
 - **Lager:** alt du vurderer, har kjøpt og har solgt.
 - **Prissjekk:** sjekk om en annonse lønner seg.
 - **Markedspriser:** hva ting pleier å koste på Finn.
+
+På **Nye funn**, **Lager** og **Markedspriser** kan du bla etter **type** (putter, driver, jernsett …) og **merke**. Hver knapp viser hvor mange det er, og valgene kan kombineres, for eksempel «Putter» + «Scotty Cameron».
 - **Finn-søk:** her legger du inn søkene scraperen skal følge med på.
 
 ---

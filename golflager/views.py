@@ -78,11 +78,89 @@ def inject_common() -> Dict[str, Any]:
         "CONDITION_LABELS": CONDITION_LABELS,
         "VERDICTS": VERDICTS,
         "rule_text": rule_text(settings),
+        "url_with": url_with,
         "app_version": current_app.config.get("VERSION", "0"),
         "update_version": (settings["update_available"]
                            if updater.is_newer(settings["update_available"],
                                                current_app.config.get("VERSION", "0"))
                            else ""),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Kategorier (type og merke)
+
+UNKNOWN_BRAND = "Ukjent merke"
+MAX_BRAND_CHIPS = 12
+
+
+def url_with(**changes: Any) -> str:
+    """Adressen til siden du er på, med noen valg endret (None fjerner et valg)."""
+    args = request.args.to_dict()
+    args.pop("side", None)
+    for key, value in changes.items():
+        if value is None or value == "":
+            args.pop(key, None)
+        else:
+            args[key] = value
+    return url_for(request.endpoint, **(request.view_args or {}), **args)
+
+
+def brand_key(brand: Optional[str]) -> str:
+    return normalize(brand or "") or normalize(UNKNOWN_BRAND)
+
+
+def selected_category() -> Tuple[str, str]:
+    """Type og merke fra adressen (?type=putter&merke=Scotty Cameron)."""
+    type_key = request.args.get("type", "")
+    if type_key not in TYPE_LABELS:
+        type_key = ""
+    brand = request.args.get("merke", "").strip()
+    return type_key, brand_key(brand) if brand else ""
+
+
+def in_category(type_key: str, brand: Optional[str], selected_type: str,
+                selected_brand: str) -> bool:
+    return ((not selected_type or type_key == selected_type)
+            and (not selected_brand or brand_key(brand) == selected_brand))
+
+
+def category_facets(rows: List[Any], type_of: Any, brand_of: Any, selected_type: str,
+                    selected_brand: str) -> Dict[str, Any]:
+    """Knappene i kategoriraden med antall. Typene telles innenfor valgt merke, og omvendt."""
+    type_counts: Dict[str, int] = {}
+    brand_counts: Dict[str, List[Any]] = {}
+    for row in rows:
+        type_key, brand = type_of(row), (brand_of(row) or "").strip()
+        key = brand_key(brand)
+        if not selected_brand or key == selected_brand:
+            type_counts[type_key] = type_counts.get(type_key, 0) + 1
+        if not selected_type or type_key == selected_type:
+            entry = brand_counts.setdefault(key, [0, {}])
+            entry[0] += 1
+            entry[1][brand or UNKNOWN_BRAND] = entry[1].get(brand or UNKNOWN_BRAND, 0) + 1
+    types = [{"key": key, "label": label, "count": type_counts.get(key, 0)}
+             for key, label in TYPES if type_counts.get(key) or key == selected_type]
+    brands = []
+    for key, (count, spellings) in brand_counts.items():
+        label = max(spellings, key=lambda name: (spellings[name], name))
+        brands.append({"key": key, "label": label, "count": count})
+    if selected_brand and selected_brand not in brand_counts:
+        brands.append({"key": selected_brand, "label": request.args.get("merke", "").strip(),
+                       "count": 0})
+    unknown = normalize(UNKNOWN_BRAND)
+    brands.sort(key=lambda b: (b["key"] == unknown, -b["count"], b["label"].lower()))
+    top = brands[:MAX_BRAND_CHIPS]
+    more = brands[MAX_BRAND_CHIPS:]
+    chosen = [b for b in more if b["key"] == selected_brand]
+    return {
+        "type": selected_type,
+        "brand": selected_brand,
+        "types": types,
+        "brands": top + chosen,
+        "more_brands": [b for b in more if b["key"] != selected_brand],
+        "type_total": sum(type_counts.values()),
+        "brand_total": sum(entry[0] for entry in brand_counts.values()),
     }
 
 
@@ -182,15 +260,24 @@ def funn():
     rows = conn.execute(query, params).fetchall()
 
     prices = PriceData(conn, settings)
-    cards = []
+    selected_type, selected_brand = selected_category()
+    checked = [{"listing": row, "check": prices.check(
+        row["brand"], row["model"], row["type"], row["price"], condition=row["condition"],
+        exclude_listing_id=row["id"])} for row in rows]
+    facets = category_facets(
+        [c for c in checked if not color or c["check"].color == color],
+        lambda c: c["listing"]["type"], lambda c: c["listing"]["brand"],
+        selected_type, selected_brand)
     counts = {"gronn": 0, "gul": 0, "rod": 0}
-    for row in rows:
-        check = prices.check(row["brand"], row["model"], row["type"], row["price"],
-                             condition=row["condition"], exclude_listing_id=row["id"])
-        counts[check.color] += 1
-        if color and check.color != color:
+    cards = []
+    for card in checked:
+        listing = card["listing"]
+        if not in_category(listing["type"], listing["brand"], selected_type, selected_brand):
             continue
-        cards.append({"listing": row, "check": check})
+        counts[card["check"].color] += 1
+        if color and card["check"].color != color:
+            continue
+        cards.append(card)
     total = len(cards)
     cards = cards[(page - 1) * PAGE_SIZE: page * PAGE_SIZE]
 
@@ -217,6 +304,7 @@ def funn():
         total=total,
         tab_counts=tab_counts,
         brands=known_values(conn, "brand"),
+        cat=facets,
     )
 
 
@@ -302,7 +390,7 @@ def funn_rett(listing_id: int):
 def lager():
     conn = get_db()
     status = request.args.get("status", "")
-    type_key = request.args.get("type", "")
+    selected_type, selected_brand = selected_category()
     text = request.args.get("q", "").strip()
     query = "SELECT * FROM inventory WHERE 1 = 1"
     params: List[Any] = []
@@ -312,14 +400,15 @@ def lager():
     elif status in STATUS_LABELS:
         query += " AND status = ?"
         params.append(status)
-    if type_key in TYPE_LABELS:
-        query += " AND type = ?"
-        params.append(type_key)
     if text:
         query += " AND (brand LIKE ? OR model LIKE ? OR notes LIKE ?)"
         params.extend([f"%{text}%"] * 3)
     order = {"vurderes": 0, "kjopt": 1, "klargjores": 2, "til_salgs": 3, "solgt": 4}
-    items = [enrich_item(dict(r)) for r in conn.execute(query, params)]
+    all_items = [enrich_item(dict(r)) for r in conn.execute(query, params)]
+    facets = category_facets(all_items, lambda i: i["type"], lambda i: i["brand"],
+                             selected_type, selected_brand)
+    items = [i for i in all_items
+             if in_category(i["type"], i["brand"], selected_type, selected_brand)]
     items.sort(key=lambda i: (
         order.get(i["status"], 9),
         -(datetime.fromisoformat(i["sale_date"] or i["purchase_date"] or i["created_at"][:10])
@@ -333,8 +422,9 @@ def lager():
         "listed": sum(i["listed_price"] or 0 for i in items if i["status"] == "til_salgs"),
         "profit": sum(i["profit"] or 0 for i in items if i["profit"] is not None),
     }
-    return render_template("lager.html", items=items, status=status, type_key=type_key, q=text,
-                           counts=counts, totals=totals)
+    return render_template("lager.html", items=items, status=status, q=text, counts=counts,
+                           totals=totals, cat=facets,
+                           filtered=bool(status or text or selected_type or selected_brand))
 
 
 EMPTY_ITEM = {
@@ -542,7 +632,7 @@ def markedspriser():
     group = request.args.get("gruppe", "modell")
     if group not in ("modell", "merke", "type"):
         group = "modell"
-    type_key = request.args.get("type", "")
+    selected_type, selected_brand = selected_category()
     text = request.args.get("q", "").strip().lower()
     months = parse_int(request.args.get("periode"))
     if months is None:
@@ -555,12 +645,12 @@ def markedspriser():
                                                                           timespec="seconds")
         query += " AND last_seen_at >= ?"
         params.append(since)
-    if type_key in TYPE_LABELS:
-        query += " AND type = ?"
-        params.append(type_key)
     rows = [dict(r) for r in conn.execute(query, params)]
     if text:
         rows = [r for r in rows if text in f"{r['brand']} {r['model']}".lower()]
+    facets = category_facets(rows, lambda r: r["type"], lambda r: r["brand"], selected_type,
+                             selected_brand)
+    rows = [r for r in rows if in_category(r["type"], r["brand"], selected_type, selected_brand)]
 
     sold = [dict(r) for r in conn.execute(
         "SELECT brand, model, type, sale_price FROM inventory WHERE status = 'solgt' "
@@ -601,8 +691,9 @@ def markedspriser():
             "own_count": len(own.get(key, [])),
         })
     table.sort(key=lambda r: (-r["count"], r["brand"].lower(), (r["model"] or "").lower()))
-    return render_template("markedspriser.html", table=table, group=group, type_key=type_key,
-                           q=request.args.get("q", ""), months=months, total=len(rows))
+    return render_template("markedspriser.html", table=table, group=group,
+                           q=request.args.get("q", ""), months=months, total=len(rows),
+                           cat=facets)
 
 
 # ---------------------------------------------------------------------------

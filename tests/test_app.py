@@ -284,3 +284,67 @@ def test_shutdown_button(app, client):
     assert "Golflager er slått av" in html
     assert calls == [True]
     assert "Slå av Golflager" in client.get("/innstillinger").get_data(as_text=True)
+
+
+@pytest.fixture
+def mixed(conn):
+    rows = [
+        (800001, "Scotty Cameron Newport 2", 2500, "Scotty Cameron", "Newport 2", "putter"),
+        (800002, "Scotty Cameron Phantom X", 3000, "Scotty Cameron", "Phantom X", "putter"),
+        (800003, "Ping Anser putter", 900, "Ping", "Anser", "putter"),
+        (800004, "Ping G425 driver", 1900, "Ping", "G425", "driver"),
+        (800005, "Titleist TSR3 driver", 3100, "Titleist", "TSR3", "driver"),
+        (800006, "Golfbag", 500, "", "", "bag"),
+    ]
+    for finn_id, title, price, brand, model, type_ in rows:
+        add_listing(conn, finn_id, title, price, brand, model, type_)
+    return conn
+
+
+def test_finds_can_be_filtered_by_type_and_brand(client, mixed):
+    html = client.get("/funn").get_data(as_text=True)
+    assert "Putter <span class=\"count\">3</span>" in html
+    assert "Scotty Cameron <span class=\"count\">2</span>" in html
+    assert "Ukjent merke <span class=\"count\">1</span>" in html
+
+    html = client.get("/funn?type=putter").get_data(as_text=True)
+    assert html.count('class="find find--') == 3
+    assert "Titleist TSR3" not in html
+    # Merkene telles innenfor valgt type
+    assert "Ping <span class=\"count\">1</span>" in html
+
+    html = client.get("/funn?type=putter&merke=Scotty+Cameron").get_data(as_text=True)
+    assert html.count('class="find find--') == 2
+    assert "Vis alle typer og merker" in html
+    # Stavemåten i adressen spiller ingen rolle
+    html = client.get("/funn?merke=scotty%20cameron").get_data(as_text=True)
+    assert html.count('class="find find--') == 2
+
+    html = client.get("/funn?merke=Ukjent+merke").get_data(as_text=True)
+    assert html.count('class="find find--') == 1 and "Golfbag" in html
+
+    html = client.get("/funn?type=wedge").get_data(as_text=True)
+    assert "Ingen annonser i denne kategorien" in html
+
+
+def test_category_links_keep_other_choices(client, mixed):
+    html = client.get("/funn?vis=ny&farge=gul&type=putter").get_data(as_text=True)
+    assert 'href="/funn?vis=ny&amp;farge=gul&amp;type=putter&amp;merke=Ping"' in html
+    assert 'href="/funn?vis=ny&amp;type=putter"' in html  # «Alle» i fargevalget beholder typen
+
+
+def test_inventory_and_market_have_categories(client, filled):
+    html = client.get("/lager?type=driver").get_data(as_text=True)
+    assert "Ping G425" in html and "Scotty Cameron Newport 2" not in html
+    html = client.get("/lager?merke=Scotty+Cameron").get_data(as_text=True)
+    assert "Ping G425" not in html and "Newport 2" in html
+    html = client.get("/markedspriser?merke=Ping").get_data(as_text=True)
+    assert "Anser" in html and "Newport 2" not in html
+    html = client.get("/markedspriser?type=putter&gruppe=merke").get_data(as_text=True)
+    assert "Scotty Cameron" in html
+
+
+def test_overview_links_to_categories(client, filled):
+    html = client.get("/").get_data(as_text=True)
+    assert 'href="/lager?status=solgt&amp;type=putter"' in html
+    assert 'href="/lager?status=solgt&amp;merke=Scotty+Cameron"' in html

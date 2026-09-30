@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import flag, icon with context %}
+{% from "_macros.html" import flag, icon, category_bar with context %}
 {% block title %}Nye funn{% endblock %}
 {% block content %}
 {% set here = request.full_path %}
@@ -16,19 +16,18 @@
 <div class="filters">
   <nav class="seg" aria-label="Vis">
     {% for key, label in [('ny', 'Nye'), ('skjult', 'Skjulte'), ('kjopt', 'Kjøpt')] %}
-      <a href="{{ url_for('main.funn', vis=key, sok=search_filter) }}" {% if view == key %}aria-current="true"{% endif %}>{{ label }} <span class="count">{{ tab_counts[key] }}</span></a>
+      <a href="{{ url_with(vis=key) }}" {% if view == key %}aria-current="true"{% endif %}>{{ label }} <span class="count">{{ tab_counts[key] }}</span></a>
     {% endfor %}
   </nav>
   <nav class="seg" aria-label="Prissjekk">
-    <a href="{{ url_for('main.funn', vis=view, sok=search_filter) }}" {% if not color %}aria-current="true"{% endif %}>Alle</a>
+    <a href="{{ url_with(farge=None) }}" {% if not color %}aria-current="true"{% endif %}>Alle</a>
     {% for key in ['gronn', 'gul', 'rod'] %}
-      <a href="{{ url_for('main.funn', vis=view, farge=key, sok=search_filter) }}" {% if color == key %}aria-current="true"{% endif %}>{{ VERDICTS[key] }} <span class="count">{{ counts[key] }}</span></a>
+      <a href="{{ url_with(farge=key) }}" {% if color == key %}aria-current="true"{% endif %}>{{ VERDICTS[key] }} <span class="count">{{ counts[key] }}</span></a>
     {% endfor %}
   </nav>
   {% if searches|length > 1 %}
     <form method="get" class="inline">
-      <input type="hidden" name="vis" value="{{ view }}">
-      {% if color %}<input type="hidden" name="farge" value="{{ color }}">{% endif %}
+      {% for key in ['vis', 'farge', 'type', 'merke'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
       <label class="visually-hidden" for="sok">Søk</label>
       <select id="sok" name="sok" data-autosubmit>
         <option value="">Alle søk</option>
@@ -37,6 +36,7 @@
     </form>
   {% endif %}
 </div>
+{{ category_bar(cat) }}
 
 {% if not cards %}
   <div class="card empty">
@@ -48,9 +48,12 @@
       {% else %}
         <p>Scraperen sjekker søkene dine jevnlig. Nye annonser dukker opp her.</p>
       {% endif %}
+    {% elif cat.type or cat.brand %}
+      <h3>Ingen annonser i denne kategorien</h3>
+      <p><a href="{{ url_with(type=None, merke=None) }}">Vis alle typer og merker</a></p>
     {% elif color %}
       <h3>Ingen annonser med denne fargen</h3>
-      <p><a href="{{ url_for('main.funn', vis=view, sok=search_filter) }}">Vis alle</a></p>
+      <p><a href="{{ url_with(farge=None) }}">Vis alle</a></p>
     {% else %}
       <h3>Her er det tomt</h3>
     {% endif %}
@@ -143,9 +146,9 @@
   <datalist id="merker">{% for b in brands %}<option value="{{ b }}">{% endfor %}</datalist>
   {% if pages > 1 %}
     <nav class="pager" aria-label="Sider">
-      {% if page > 1 %}<a class="btn" href="{{ url_for('main.funn', vis=view, farge=color or None, sok=search_filter, side=page - 1) }}">← Nyere</a>{% endif %}
+      {% if page > 1 %}<a class="btn" href="{{ url_with(side=page - 1) }}">← Nyere</a>{% endif %}
       <span class="muted small">Side {{ page }} av {{ pages }} · {{ total }} annonser</span>
-      {% if page < pages %}<a class="btn" href="{{ url_for('main.funn', vis=view, farge=color or None, sok=search_filter, side=page + 1) }}">Eldre →</a>{% endif %}
+      {% if page < pages %}<a class="btn" href="{{ url_with(side=page + 1) }}">Eldre →</a>{% endif %}
     </nav>
   {% endif %}
 {% endif %}

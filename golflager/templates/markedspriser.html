@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon with context %}
+{% from "_macros.html" import icon, category_bar with context %}
 {% block title %}Markedspriser{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -20,15 +20,11 @@
 <form method="get" class="filters">
   <nav class="seg" aria-label="Vis per">
     {% for key, label in [('modell', 'Modell'), ('merke', 'Merke'), ('type', 'Type')] %}
-      <a href="{{ url_for('main.markedspriser', gruppe=key, type=type_key or None, periode=months, q=q or None) }}" {% if group == key %}aria-current="true"{% endif %}>Per {{ label|lower }}</a>
+      <a href="{{ url_with(gruppe=key) }}" {% if group == key %}aria-current="true"{% endif %}>Per {{ label|lower }}</a>
     {% endfor %}
   </nav>
   <input type="hidden" name="gruppe" value="{{ group }}">
-  <label class="visually-hidden" for="type">Type</label>
-  <select id="type" name="type" data-autosubmit>
-    <option value="">Alle typer</option>
-    {% for key, label in TYPES %}<option value="{{ key }}" {% if type_key == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
-  </select>
+  {% for key in ['type', 'merke'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
   <label class="visually-hidden" for="periode">Periode</label>
   <select id="periode" name="periode" data-autosubmit>
     {% for value, label in [(3, 'Siste 3 måneder'), (12, 'Siste 12 måneder'), (0, 'Hele perioden')] %}
@@ -38,6 +34,7 @@
   <label class="visually-hidden" for="q">Søk</label>
   <input type="search" id="q" name="q" value="{{ q }}" placeholder="Søk etter merke eller modell">
 </form>
+{{ category_bar(cat) }}
 
 <div class="card">
   {% if table %}

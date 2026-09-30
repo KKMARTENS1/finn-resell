@@ -154,7 +154,7 @@
       <div class="hbars">
         {% for r in d.type_rows %}
           <div class="hbar">
-            <span class="hbar__label">{{ r.label }}</span>
+            <a class="hbar__label" href="{{ url_for('main.lager', type=r.key) }}">{{ r.label }}</a>
             <span class="hbar__track">
               {% if r.sold %}<span class="hbar__seg hbar__seg--1" style="width: {{ r.sold_w }}%" tabindex="0"
                     data-tip-value="{{ r.sold }} solgt" data-tip-label="{{ r.label }}"></span>{% endif %}
@@ -179,14 +179,14 @@
 </section>
 
 <section class="split" style="margin-bottom:18px">
-  {% for title, rows in [('Typer som gir mest fortjeneste', d.top_types), ('Merker som gir mest fortjeneste', d.top_brands)] %}
+  {% for title, rows, param in [('Typer som gir mest fortjeneste', d.top_types, 'type'), ('Merker som gir mest fortjeneste', d.top_brands, 'merke')] %}
     <div class="card">
       <div class="card__head"><h2>{{ title }}</h2><p>Solgte ting</p></div>
       {% if rows %}
         <ol class="rank">
           {% for r in rows %}
             <li>
-              <span class="rank__name">{{ r.name }}</span>
+              <a class="rank__name" href="{{ url_for('main.lager', status='solgt', **{param: r.key}) }}">{{ r.name }}</a>
               <span class="rank__value{% if r.profit < 0 %} neg{% endif %}">{{ r.profit|kr }}</span>
               <span class="rank__track"><span class="rank__fill{% if r.profit < 0 %} neg{% endif %}" style="width: {{ r.width }}%; display:block"></span></span>
               <span class="rank__meta">{{ r.count }} solgt · snitt {{ r.avg|kr }} per ting</span>

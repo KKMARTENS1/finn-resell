@@ -27,6 +27,7 @@
   --accent-hover: #175a3a;
   --accent-soft: #e3f0e7;
   --focus: #2a78d6;
+  --selected: #133d2b;
 
   --go: #16924a;
   --go-bg: #e3f4e8;
@@ -69,6 +70,7 @@
     --accent-hover: #37a56c;
     --accent-soft: #173526;
     --focus: #5598e7;
+    --selected: #2f8f5d;
     --go: #34c26a;
     --go-bg: rgba(52, 194, 106, .14);
     --go-ink: #6fdc98;
@@ -236,7 +238,32 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--f
   text-decoration: none; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
 }
 .seg a:hover { background: var(--surface-2); color: var(--ink); }
-.seg a[aria-current="true"] { background: var(--course); color: #fff; }
+.seg a[aria-current="true"] { background: var(--selected); color: #fff; }
+
+/* Kategoriraden (type og merke) */
+.catbar {
+  display: flex; flex-direction: column; gap: 10px; margin: -4px 0 18px;
+  padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+}
+.catbar__row { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; align-items: start; }
+.catbar__label {
+  font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .05em; padding-top: 7px;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip-link {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 99px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2);
+  font-size: 13.5px; font-weight: 550; text-decoration: none; white-space: nowrap; cursor: pointer;
+  list-style: none;
+}
+.chip-link::-webkit-details-marker { display: none; }
+.chip-link:hover { border-color: var(--ink-2); color: var(--ink); text-decoration: none; }
+.chip-link[aria-current="true"] { background: var(--selected); border-color: var(--selected); color: #fff; }
+.chip-link .count { font-size: 12px; opacity: .65; font-variant-numeric: tabular-nums; }
+.chips__more[open] { flex-basis: 100%; }
+.chips__more[open] > summary { margin-bottom: 6px; }
+.catbar__reset { font-size: 13px; margin-left: 68px; }
 .seg .count { font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums; }
 
 /* ---------- Kort og paneler ---------- */
@@ -314,6 +341,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--f
 .hbars { display: flex; flex-direction: column; gap: 12px; }
 .hbar { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 14px; }
 .hbar__label { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.hbar__label:hover, a.rank__name:hover { color: var(--accent); }
 .hbar__track { display: flex; gap: 2px; height: 16px; align-items: stretch; }
 .hbar__seg { border-radius: 0; min-width: 3px; }
 .hbar__seg:first-child { border-radius: 4px 0 0 4px; }
@@ -326,7 +354,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--f
 
 .rank { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .rank li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: 14px; }
-.rank__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
 .rank__value { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
 .rank__track { grid-column: 1 / -1; height: 6px; border-radius: 99px; background: var(--surface-2); }
 .rank__fill { height: 100%; border-radius: 99px; background: var(--series-1); }
@@ -508,6 +536,10 @@ tfoot td { font-weight: 700; border-top: 1px solid var(--line-strong); border-bo
   .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); }
   .grid-4.keep, .grid-2.keep { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filters select, .filters input[type="search"] { flex: 1; min-width: 0; }
+  .catbar { padding: 10px 12px; }
+  .catbar__row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .catbar__label { padding-top: 0; }
+  .catbar__reset { margin-left: 0; }
   .card { padding: 16px; }
   .search-row { grid-template-columns: minmax(0, 1fr); }
   .search-row__actions { justify-content: flex-start; }
