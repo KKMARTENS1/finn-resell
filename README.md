@@ -21,7 +21,8 @@ Dette får du:
 2. **Åpne Terminal.** Trykk `Cmd + mellomrom`, skriv `Terminal` og trykk Enter.
 3. **Start appen.** Skriv `bash ` (med mellomrom etter), dra filen **start.sh** fra mappen inn i Terminal-vinduet, og trykk Enter.
 4. Hvis Macen spør om å installere **utviklerverktøy** («command line developer tools»), trykk **Installer** og vent til det er ferdig. Gjør så steg 3 én gang til.
-5. Første oppstart tar et minutt eller to. Så åpner appen seg i nettleseren, og **Golflager-ikonet** (et gult flagg på grønn bakgrunn) legges i Dock.
+5. Første oppstart tar et minutt eller to. Golflager installeres i mappen **Golflager** i hjemmemappen din (`~/Golflager/program`), appen åpner seg i nettleseren, og **Golflager-ikonet** (et gult flagg på grønn bakgrunn) legges i Dock.
+6. Mappen du lastet ned, trengs ikke lenger. Du kan slette den.
 
 ### Senere: klikk på ikonet
 
@@ -29,7 +30,6 @@ Klikk på **Golflager-ikonet i Dock**. Appen starter i bakgrunnen og åpner seg 
 
 - Ikonet ligger også i **Programmer**. Du finner det med `Cmd + mellomrom` ved å skrive **Golflager**.
 - Kjører Golflager allerede, åpner ikonet bare nettleseren.
-- Første gang du klikker på ikonet, kan Macen spørre om Golflager får tilgang til mappen der appen ligger (for eksempel Dokumenter). Trykk **OK**.
 
 ### Stoppe
 
@@ -37,9 +37,9 @@ Golflager kjører i bakgrunnen og sjekker Finn til du slår av Macen. Vil du sto
 
 Har du startet med `bash start.sh` i Terminal, kan du også trykke `Ctrl + C` der.
 
-### Hvis du flytter mappen
+### Hvorfor ligger programmet i ~/Golflager?
 
-Ikonet husker hvor Golflager-mappen ligger. Flytter du mappen, eller laster ned en ny versjon til et annet sted, kjører du `bash start.sh` fra den nye mappen én gang. Da blir ikonet oppdatert.
+Macen sperrer mappene Dokumenter, Skrivebord og Nedlastinger for programmer som ikke har fått tillatelse. Derfor installeres Golflager i `~/Golflager/program`, der ikonet alltid får starte appen. Dataene dine ligger i samme mappe.
 
 ---
 

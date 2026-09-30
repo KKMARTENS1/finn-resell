@@ -56,7 +56,11 @@ for _ in $(seq 1 300); do
   fi
   if ! kill -0 "$PID" 2>/dev/null; then
     rm -f "$LOCK"
-    feil "$(grep -v '^[[:space:]]*$' "$LOG" | tail -n 4)"
+    if grep -q "Operation not permitted" "$LOG"; then
+      feil "Macen sperrer mappen der Golflager ligger ($APP_DIR). Åpne Terminal, skriv bash og et mellomrom, dra inn start.sh fra den mappen og trykk Enter. Da flyttes Golflager til en mappe som ikonet får bruke."
+    else
+      feil "$(grep -v '^[[:space:]]*$' "$LOG" | tail -n 4)"
+    fi
     exit 1
   fi
   sleep 1

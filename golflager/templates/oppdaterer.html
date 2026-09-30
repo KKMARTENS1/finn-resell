@@ -32,7 +32,7 @@
       .catch(again);
   }
   function again() {
-    if (Date.now() - started > 180000) {
+    if (Date.now() - started > 300000) {
       document.getElementById("tittel").textContent = "Dette tar lengre tid enn vanlig";
       document.getElementById("tekst").textContent =
         "Klikk på Golflager-ikonet i Dock for å starte appen. Står det en feilmelding, send den til den som laget appen.";
