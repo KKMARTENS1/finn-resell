@@ -20,7 +20,7 @@ from .classify import normalize, title_type
 from .constants import (CONDITION_LABELS, CONDITIONS, IN_STOCK, LISTING_STATUSES, STATUS_LABELS,
                         STATUSES, TYPE_LABELS, TYPES, VERDICTS)
 from .db import (LIMITS, connect, get_settings, log_event, now_str, set_setting, today_str)
-from .pricing import PriceCheck, PriceData, rule_text
+from .pricing import PriceCheck, PriceData, percentile, rule_text
 from .scraper import normalize_search_url, suggest_name
 
 bp = Blueprint("main", __name__)
@@ -223,7 +223,8 @@ def check_listing(prices: PriceData, row: sqlite3.Row) -> PriceCheck:
     type_known = bool(row["manual_class"]) or title_type(row["title"]) is not None
     return prices.check(row["brand"], row["model"], row["type"], row["price"],
                         condition=row["condition"], exclude_listing_id=row["id"],
-                        title=row["title"], type_known=type_known)
+                        title=row["title"], type_known=type_known,
+                        condition_from_title=not row["manual_class"])
 
 
 @bp.route("/")
@@ -288,6 +289,13 @@ def sort_cards(cards: List[Dict[str, Any]], sort_key: str) -> List[Dict[str, Any
     return cards
 
 
+def title_matches(title: str, text: str) -> bool:
+    """Søket i Nye funn: alle ordene må stå i tittelen («stealth 3» finner «Stealth 3-wood»)."""
+    words = text.casefold().split()
+    folded = (title or "").casefold()
+    return all(word in folded for word in words)
+
+
 def view_condition(view: str) -> Tuple[str, List[Any]]:
     """SQL-vilkår for fanene i Nye funn. Solgte annonser vises bare under «Solgt / borte»."""
     if view == "borte":
@@ -305,6 +313,7 @@ def filtered_finds(conn: sqlite3.Connection, args: Any) -> Dict[str, Any]:
         view = "ny"
     color = args.get("farge", "")
     search_filter = parse_int(args.get("sok"))
+    text = args.get("q", "").strip()
     age = parse_int(args.get("alder"))
     if age not in dict(FIND_AGES):
         age = None
@@ -323,7 +332,8 @@ def filtered_finds(conn: sqlite3.Connection, args: Any) -> Dict[str, Any]:
         query += " AND COALESCE(l.published_at, l.first_seen_at) < ?"
         params.append(cutoff)
     query += " ORDER BY l.first_seen_at DESC, COALESCE(l.published_at, '') DESC, l.id DESC"
-    rows = conn.execute(query, params).fetchall()
+    rows = [row for row in conn.execute(query, params).fetchall()
+            if title_matches(row["title"], text)]
 
     prices = PriceData(conn, settings)
     selected_type, selected_brand = selected_category()
@@ -344,7 +354,7 @@ def filtered_finds(conn: sqlite3.Connection, args: Any) -> Dict[str, Any]:
         cards.append(card)
     return {
         "view": view, "color": color, "search_filter": search_filter, "sort": sort_key,
-        "age": age,
+        "age": age, "text": text,
         "cards": sort_cards(cards, sort_key), "counts": counts, "cat": facets,
         "settings": settings,
     }
@@ -367,8 +377,13 @@ def funn():
     tab_counts = {}
     for key in LISTING_STATUSES:
         condition, params = view_condition(key)
-        tab_counts[key] = conn.execute(
-            f"SELECT COUNT(*) FROM listings l WHERE {condition}", params).fetchone()[0]
+        if found["text"]:
+            # Med søk viser fanene hvor mange treff det er i hver, så du ser hvor annonsen er
+            titles = conn.execute(f"SELECT l.title FROM listings l WHERE {condition}", params)
+            tab_counts[key] = sum(1 for row in titles if title_matches(row[0], found["text"]))
+        else:
+            tab_counts[key] = conn.execute(
+                f"SELECT COUNT(*) FROM listings l WHERE {condition}", params).fetchone()[0]
     return render_template(
         "funn.html",
         cards=cards,
@@ -377,6 +392,7 @@ def funn():
         color=found["color"],
         search_filter=found["search_filter"],
         age=found["age"],
+        text=found["text"],
         ages=FIND_AGES,
         sort=found["sort"],
         sorts=FIND_SORTS,
@@ -791,23 +807,20 @@ def prissjekk():
             title=listing["title"] if listing is not None else "",
             type_known=(not from_listing or bool(listing["manual_class"])
                         or title_type(listing["title"]) is not None),
+            condition_from_title=from_listing and not listing["manual_class"],
         )
+    debug_text = ""
+    if result is not None:
+        from .diagnostics import describe_check
+
+        debug_text = describe_check(form, result, listing, current_app.config.get("VERSION", "0"))
     return render_template("prissjekk.html", form=form, result=result, listing=listing,
+                           debug_text=debug_text,
                            brands=known_values(conn, "brand"), models=known_values(conn, "model"))
 
 
 # ---------------------------------------------------------------------------
 # Markedspriser
-
-
-def percentile(values: List[int], fraction: float) -> float:
-    ordered = sorted(values)
-    if len(ordered) == 1:
-        return ordered[0]
-    position = (len(ordered) - 1) * fraction
-    low = int(position)
-    high = min(low + 1, len(ordered) - 1)
-    return ordered[low] + (ordered[high] - ordered[low]) * (position - low)
 
 
 MARKET_SORTS = [

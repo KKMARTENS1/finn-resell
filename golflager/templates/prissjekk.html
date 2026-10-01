@@ -108,6 +108,13 @@
           </p>
         </section>
       {% endif %}
+
+      <details class="card debug" style="margin-top:18px">
+        <summary><strong>Ser anslaget helt feil ut?</strong></summary>
+        <p class="small" style="margin-top:8px">Kopier teksten og send den til den som lager appen. Den viser hva annonsen ble sammenlignet med.</p>
+        <textarea id="debug-text" readonly style="margin-top:10px; min-height:140px; font: 12px/1.4 ui-monospace, Menlo, monospace">{{ debug_text }}</textarea>
+        <button class="btn btn--primary" type="button" data-copy="#debug-text" style="margin-top:10px">Kopier teksten</button>
+      </details>
     {% else %}
       <div class="card empty">
         <h3>Fyll inn en annonse</h3>

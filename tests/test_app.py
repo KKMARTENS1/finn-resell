@@ -377,3 +377,22 @@ def test_grey_finds_have_their_own_filter_and_hide_the_profit(client, conn):
     assert "TSi2" not in html
     assert "Usikker <span class=\"count\">1</span>" in html
     assert "Forventet salg" not in html
+
+
+def test_search_in_finds_shows_where_the_ad_is(client, conn):
+    add_listing(conn, 830001, "TaylorMade Stealth 3-wood", 900, "TaylorMade", "Stealth", "fairway")
+    add_listing(conn, 830002, "Ping Anser putter", 900, "Ping", "Anser", "putter")
+    conn.execute("UPDATE listings SET status = 'skjult' WHERE finn_id = '830001'")
+    conn.commit()
+    html = client.get("/funn?q=stealth+3").get_data(as_text=True)
+    assert "Ingen treff på «stealth 3» her" in html
+    assert 'Skjulte <span class="count">1</span>' in html
+    html = client.get("/funn?vis=skjult&q=STEALTH").get_data(as_text=True)
+    assert "TaylorMade Stealth 3-wood" in html and "Ping Anser" not in html
+
+
+def test_price_check_has_text_to_copy(client, filled, conn):
+    listing_id = conn.execute("SELECT id FROM listings LIMIT 1").fetchone()[0]
+    html = client.get(f"/prissjekk?funn={listing_id}").get_data(as_text=True)
+    assert "Ser anslaget helt feil ut?" in html
+    assert "Golflager feilsøking: prissjekk" in html

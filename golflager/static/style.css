@@ -581,3 +581,6 @@ tfoot td { font-weight: 700; border-top: 1px solid var(--line-strong); border-bo
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+.filters .search-form { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 250px; max-width: 420px; }
+.filters .search-form input[type="search"] { max-width: none; }
+details.debug summary { cursor: pointer; }

@@ -93,3 +93,26 @@ def describe_listing(conn: sqlite3.Connection, listing: sqlite3.Row, version: st
         lines.append(f"\nAnnonsen var ikke med i de siste søkesidene ({len(pages)} sider lagret). "
                      "Da forsvinner den ved neste sjekk for solgte annonser.")
     return "\n".join(lines)
+
+
+def describe_check(form: dict, result: Any, listing: Optional[sqlite3.Row], version: str) -> str:
+    """Prissjekken som tekst, så du kan sende den hvis et anslag ser helt feil ut."""
+    lines = ["Golflager feilsøking: prissjekk", f"Versjon: {version}"]
+    if listing is not None:
+        lines += [f"Finnkode: {listing['finn_id']}", f"Tittel: {listing['title']}",
+                  f"Rettet for hånd: {'ja' if listing['manual_class'] else 'nei'}"]
+    lines += [
+        f"Merke: {form.get('brand')}  Modell: {form.get('model')}  Type: {form.get('type')}",
+        f"Tilstand: {form.get('condition') or 'ukjent'}  Pris: {form.get('price')}",
+        f"Svar: {result.label} ({result.color}), sikkerhet: {result.confidence}",
+        f"Forventet salg: {result.expected_sale}  Typisk pris: {result.typical_price}  "
+        f"Fortjeneste: {result.profit}",
+        f"Begrunnelse: {result.reason}",
+        f"Grunnlag: {result.basis}",
+    ]
+    lines += [f"Merknad: {note}" for note in result.notes]
+    if result.comparables:
+        lines.append(f"--- Sammenlignet med ({len(result.comparables)}) ---")
+        for c in result.comparables[:30]:
+            lines.append(f"{c.price} kr | {c.date} | {c.label} | {c.url}")
+    return "\n".join(lines)[:MAX_CHARS]

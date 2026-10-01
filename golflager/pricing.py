@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from statistics import median
 from typing import Any, Dict, List, Optional
 
-from .classify import detect_variant, normalize, variant_who
+from .classify import detect_variant, normalize, variant_text
 from .constants import IN_STOCK
 
 # Typer der innholdet varierer så mye (antall baller, hva som følger med et sett) at
@@ -84,6 +84,30 @@ def _model_match(query_key: str, candidate_key: str) -> Optional[str]:
 # Annonser under denne andelen av vanlig pris er «for gode til å være sanne» når
 # tilstanden er ukjent. Det skyldes ofte skader eller slitasje som bare synes på bildene.
 SUSPICIOUS_SHARE = 0.5
+
+
+def percentile(values: List[int], fraction: float) -> float:
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    position = (len(ordered) - 1) * fraction
+    low = int(position)
+    high = min(low + 1, len(ordered) - 1)
+    return ordered[low] + (ordered[high] - ordered[low]) * (position - low)
+
+
+# Er de dyreste annonsene minst dobbelt så dyre som de billigste, spriker prisene for mye
+# til at midtverdien sier noe. (Med 4 eller flere ser vi bort fra den dyreste og billigste
+# fjerdedelen.)
+SPREAD_RATIO = 2.0
+
+
+def _wide_spread(prices: List[int]) -> bool:
+    if len(prices) < 2:
+        return False
+    if len(prices) < 4:
+        return prices[-1] >= prices[0] * SPREAD_RATIO
+    return percentile(prices, 0.75) >= percentile(prices, 0.25) * SPREAD_RATIO
 
 
 def _unrated_reason(type_key: str) -> str:
@@ -196,12 +220,15 @@ class PriceData:
         exclude_inventory_id: Optional[int] = None,
         title: str = "",
         type_known: bool = True,
+        condition_from_title: bool = False,
     ) -> PriceCheck:
         """Sjekker én ting.
 
         `title` er annonsetittelen (brukes til å se om det er junior-, dame- eller
         venstrehendt). `type_known` er False når tittelen ikke sier hva slags kølle det er,
         og typen bare er gjettet ut fra søket. Da blir svaret aldri grønt.
+        `condition_from_title` er True når tilstanden bare er lest ut av tittelen, ikke satt av
+        deg. Da kan en uvanlig lav pris fortsatt bety skader eller en annen utgave.
         """
         s = self.settings
         brand_key, model_key = normalize(brand), normalize(model)
@@ -264,7 +291,13 @@ class PriceData:
                 date=(item["first_seen_at"] or "")[:10],
                 url=item["url"],
             ) for item in chosen]
-            typical = median(c.price for c in comps)
+            prices = sorted(c.price for c in comps)
+            typical = median(prices)
+            # Spriker prisene mye, finnes det trolig flere utgaver av modellen (eller noen
+            # ber altfor mye). Da brukes den lave delen, så anslaget ikke blir for optimistisk.
+            spread = _wide_spread(prices)
+            if spread:
+                typical = prices[0] if len(prices) < 4 else percentile(prices, 0.25)
             result.typical_price = int(round(typical))
             result.expected_sale = int(round(typical * factor * adjust))
             result.comparables = sorted(comps, key=lambda c: c.date, reverse=True)
@@ -273,8 +306,10 @@ class PriceData:
                     "broad": "samme merke og type"}[chosen_level]
             result.basis = (
                 f"Basert på {n} {'annonse' if n == 1 else 'annonser'} på Finn ({what}). "
-                f"Typisk utlagt pris er {_num(typical)} kr, og vi regner med at du får "
-                f"{s['sale_factor_pct']:g} % av det."
+                + (f"Prisene spriker mye (fra {_num(prices[0])} til {_num(prices[-1])} kr), så "
+                   f"vi bruker den lave delen: {_num(typical)} kr. " if spread else
+                   f"Typisk utlagt pris er {_num(typical)} kr. ")
+                + f"Vi regner med at du får {s['sale_factor_pct']:g} % av det."
             )
             # Bare samme modell gir et sikkert svar. «Stealth» og «Stealth 2 Plus» koster ulikt,
             # og deler (hoder, skaft) varierer for mye til at utlagte priser er nok.
@@ -286,6 +321,10 @@ class PriceData:
             elif type_key == "deler":
                 result.confidence = "lav"
                 result.uncertainty = "prisene på deler varierer mye"
+            elif spread:
+                result.confidence = "lav"
+                result.uncertainty = ("prisene på denne modellen spriker mye, så det finnes "
+                                      "trolig flere utgaver")
             elif n < min_comp:
                 result.confidence = "lav"
                 result.uncertainty = "det finnes lite å sammenligne med"
@@ -297,11 +336,11 @@ class PriceData:
             result.uncertainty = ("tittelen sier ikke hva slags kølle det er, så typen er "
                                   "gjettet ut fra søket")
         if variant:
-            result.notes.append(
-                f"Tittelen tyder på at dette er for {variant_who(variant)}. Den sammenlignes "
-                "bare med like annonser, og det er ofte færre kjøpere, så det kan ta lengre "
-                "tid å selge."
-            )
+            note = (f"Tittelen tyder på at dette er {variant_text(variant)}. Den sammenlignes "
+                    "bare med like annonser.")
+            if variant != "samler":
+                note += " Det er ofte færre kjøpere, så det kan ta lengre tid å selge."
+            result.notes.append(note)
 
         result.extra_costs = (
             int(extra_costs) if extra_costs is not None else self.estimate_extras(type_key)
@@ -317,8 +356,8 @@ class PriceData:
             elif not brand_key:
                 result.reason = "Merket er ukjent, så det finnes ingenting å sammenligne med."
             elif variant:
-                result.reason = (f"Fant ingen andre annonser for {variant_who(variant)} å "
-                                 "sammenligne med (samme merke og type). Sjekk prisen selv.")
+                result.reason = ("Fant ingen like annonser å sammenligne med (samme merke og "
+                                 f"type, {variant_text(variant)}). Sjekk prisen selv.")
             else:
                 result.reason = ("Fant ingen egne salg eller annonser å sammenligne med. "
                                  "Sjekk prisen selv, eller legg inn merke og modell.")
@@ -351,7 +390,7 @@ class PriceData:
         result.max_price = max(0, int(max_price // 10 * 10))
 
         result.suspicious = (
-            condition is None and result.typical_price is not None
+            (condition is None or condition_from_title) and result.typical_price is not None
             and price < result.typical_price * SUSPICIOUS_SHARE
         )
 
@@ -369,11 +408,12 @@ class PriceData:
         elif result.meets_rule:
             result.decision = "Kjøp"
             if result.suspicious:
-                result.color, result.label = "gul", "Sjekk tilstand"
+                result.color, result.label = "gul", "Sjekk nøye"
                 result.reason = (
-                    f"Uvanlig billig: vanlig pris er rundt {_num(result.typical_price)} kr. Det betyr ofte "
-                    "skader eller mye slitasje. Se nøye på bildene, og sett tilstanden hvis den "
-                    "er dårlig."
+                    f"Uvanlig billig: vanlig pris er rundt {_num(result.typical_price)} kr. "
+                    "Det betyr ofte skader, mye slitasje eller en enklere utgave enn annonsene "
+                    "den sammenlignes med. Se nøye på bildene og sammenligningen, og sett "
+                    "tilstanden under «Rett» når du har sjekket."
                 )
             elif result.confidence == "god":
                 result.color, result.label = "gronn", "Kjøp"

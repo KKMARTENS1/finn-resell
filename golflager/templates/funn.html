@@ -25,8 +25,14 @@
       <a href="{{ url_with(farge=key) }}" {% if color == key %}aria-current="true"{% endif %}>{{ VERDICTS[key] }} <span class="count">{{ counts[key] }}</span></a>
     {% endfor %}
   </nav>
+  <form method="get" class="inline search-form" role="search">
+    {% for key in ['vis', 'farge', 'type', 'merke', 'sorter', 'sok', 'alder'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
+    <label class="visually-hidden" for="q">Søk i titlene</label>
+    <input type="search" id="q" name="q" value="{{ text }}" placeholder="Søk, f.eks. «stealth 3»">
+    {% if text %}<a class="btn btn--ghost btn--small" href="{{ url_with(q=None) }}">Tøm</a>{% endif %}
+  </form>
   <form method="get" class="inline">
-    {% for key in ['vis', 'farge', 'type', 'merke', 'sorter', 'sok'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
+    {% for key in ['vis', 'farge', 'type', 'merke', 'sorter', 'sok', 'q'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
     <label class="visually-hidden" for="alder">Alder</label>
     <select id="alder" name="alder" data-autosubmit>
       <option value="">Alle aldre</option>
@@ -35,7 +41,7 @@
   </form>
   {% if searches|length > 1 %}
     <form method="get" class="inline">
-      {% for key in ['vis', 'farge', 'type', 'merke', 'sorter', 'alder'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
+      {% for key in ['vis', 'farge', 'type', 'merke', 'sorter', 'alder', 'q'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
       <label class="visually-hidden" for="sok">Søk</label>
       <select id="sok" name="sok" data-autosubmit>
         <option value="">Alle søk</option>
@@ -70,7 +76,10 @@
 
 {% if not cards %}
   <div class="card empty">
-    {% if view == 'ny' and not tab_counts['ny'] %}
+    {% if text %}
+      <h3>Ingen treff på «{{ text }}» her</h3>
+      <p>Se om tallene på fanene over viser treff et annet sted, for eksempel under Skjulte eller Solgt / borte.</p>
+    {% elif view == 'ny' and not tab_counts['ny'] %}
       <h3>Ingen nye funn akkurat nå</h3>
       {% if not searches %}
         <p>Legg inn et søk fra Finn, for eksempel «Scotty Cameron» med makspris. Scraperen følger med og legger nye annonser her.</p>

@@ -313,23 +313,31 @@ def classify(title: str, default_brand: str = "", default_type: str = "") -> Tup
     return brand or default_brand or "", model, type_key or default_type or "annet"
 
 
-# Junior-, dame- og venstrehendte køller har sine egne priser og sammenlignes bare med hverandre.
+# Junior-, dame- og venstrehendte køller, og tour- og samlerutgaver (Circle T, GSS, Limited),
+# har sine egne priser og sammenlignes bare med hverandre.
 _VARIANT_RES = [
     ("junior", re.compile(r"\bjunior\w*|\bjr\b|\bbarne\w*|\bbarn\b|\bkids?\b", re.I)),
     ("dame", re.compile(r"\bdame\w*|\bladies\b|\blady\b|\bwomen'?s?\b|\bkvinne\w*", re.I)),
     ("venstre", re.compile(r"\bvenstre\w*|\bleft[\s-]?hand\w*|\blh\b|\bkeivhendt\w*", re.I)),
+    ("samler", re.compile(
+        r"\bcircle\s*t\b|\btour\s*(?:only|issue|use|rat|van|department|dept)\b|\bgss\b"
+        r"|\bcustom\s*shop\b|\bgarage\b|\blimited\b|\bltd\b|\bbutton\s*back\b|\bmasterful\b"
+        r"|\btimeless\b|\bsuper\s*rat\b|\bjet\s*set\b|\bchampions?\s*choice\b|\bmy\s*girl\b"
+        r"|\bteryllium\b|\btei3\b|\bproto(?:type)?\b|\bsamler\w*|\bhandmade\b|\b009m?\b"
+        r"|\bclub\s*cameron\b", re.I)),
 ]
-_VARIANT_WHO = {"junior": "juniorer", "dame": "damer", "venstre": "venstrehendte"}
+_VARIANT_TEXT = {"junior": "for juniorer", "dame": "for damer", "venstre": "for venstrehendte",
+                 "samler": "en tour- eller samlerutgave"}
 
 
 def detect_variant(title: str) -> str:
-    """«junior», «dame», «venstre» (eller flere, med komma). Tom tekst = vanlig herrekølle."""
+    """«junior», «dame», «venstre», «samler» (eller flere, med komma). Tom tekst = vanlig kølle."""
     return ",".join(name for name, pattern in _VARIANT_RES if pattern.search(title or ""))
 
 
-def variant_who(variant: str) -> str:
-    """«junior,venstre» -> «juniorer og venstrehendte»."""
-    return " og ".join(_VARIANT_WHO[v] for v in variant.split(",") if v in _VARIANT_WHO)
+def variant_text(variant: str) -> str:
+    """«junior,venstre» -> «for juniorer og for venstrehendte»."""
+    return " og ".join(_VARIANT_TEXT[v] for v in variant.split(",") if v in _VARIANT_TEXT)
 
 
 WANTED_RE = re.compile(

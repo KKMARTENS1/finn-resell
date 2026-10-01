@@ -44,7 +44,7 @@ def test_market_prices_with_sale_factor(conn):
     assert r.extra_costs == 150  # standard
     assert r.profit == 2700 - 1500 - 150
     assert r.color == "gronn"
-    assert "Typisk utlagt pris er 3 000 kr, og vi regner" in r.basis
+    assert "Typisk utlagt pris er 3 000 kr. Vi regner med at du får 90 % av det." in r.basis
 
 
 def test_few_market_prices_give_yellow(conn):
@@ -140,9 +140,13 @@ def test_suspiciously_cheap_with_unknown_condition_is_yellow(conn):
                     "Newport 2", "putter")
     r = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=1200)
     assert r.meets_rule and r.suspicious
-    assert r.color == "gul" and r.label == "Sjekk tilstand"
+    assert r.color == "gul" and r.label == "Sjekk nøye"
     assert "Uvanlig billig: vanlig pris er rundt 3 000 kr" in r.reason
-    assert "bildene, og sett" in r.reason
+    assert "en enklere utgave" in r.reason
+    # Tilstand som bare er lest ut av tittelen («pent brukt»), fjerner ikke advarselen
+    r = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=1200,
+              condition=4, condition_from_title=True)
+    assert r.suspicious and r.color == "gul"
     # Når du har sett bildene og satt tilstanden, er det ikke lenger mistenkelig
     r = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=1200,
               condition=3)
@@ -227,3 +231,38 @@ def test_junior_ladies_and_left_handed_are_compared_with_their_own_kind(conn):
     junior = check(conn, brand="Callaway", model="Rogue", type_key="driver", price=600,
                    title="Callaway Rogue junior driver")
     assert junior.expected_sale is None
+
+
+def test_wide_price_spread_uses_the_low_end(conn):
+    # Vanlige Newport 2 og dyre utgaver med samme modellnavn i tittelen
+    for i, price in enumerate([3000, 3200, 3500, 9000, 12000, 15000]):
+        add_listing(conn, 9950 + i, "Scotty Cameron Newport 2", price, "Scotty Cameron",
+                    "Newport 2", "putter")
+    r = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=2000)
+    assert r.typical_price == 3275  # nedre kvartil, ikke midtverdien 6250
+    assert r.expected_sale == round(3275 * 0.9)
+    assert r.confidence == "lav" and r.color != "gronn"
+    assert "Prisene spriker mye (fra 3 000 til 15 000 kr)" in r.basis
+    assert "spriker mye" in r.reason
+
+
+def test_two_very_different_prices_use_the_lowest(conn):
+    for i, price in enumerate([3000, 15000]):
+        add_listing(conn, 9960 + i, "Bettinardi Queen B", price, "Bettinardi", "Queen B", "putter")
+    r = check(conn, brand="Bettinardi", model="Queen B", type_key="putter", price=1500)
+    assert r.typical_price == 3000
+
+
+def test_tour_and_collector_putters_are_kept_apart(conn):
+    for i in range(3):
+        add_listing(conn, 9970 + i, "Scotty Cameron Newport 2 Circle T", 20000, "Scotty Cameron",
+                    "Newport 2", "putter")
+        add_listing(conn, 9980 + i, "Scotty Cameron Newport 2", 3000, "Scotty Cameron",
+                    "Newport 2", "putter")
+    normal = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter",
+                   price=1800, title="Scotty Cameron Newport 2 putter")
+    assert {c.price for c in normal.comparables} == {3000}
+    tour = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter",
+                 price=12000, title="Scotty Cameron Newport 2 Circle T tour only")
+    assert {c.price for c in tour.comparables} == {20000}
+    assert any("tour- eller samlerutgave" in note for note in tour.notes)

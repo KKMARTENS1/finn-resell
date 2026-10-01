@@ -33,6 +33,10 @@ Golflager oppdager når annonser er solgt, uten å åpne enkeltannonser:
 - Ser du at en annonse er solgt før Golflager oppdager det, trykker du **Solgt** på kortet. Under **Innstillinger → Feilsøking** finner du da en tekst som viser hvordan annonsen så ut i søket. Send den til den som lager appen, så kan Golflager lære å oppdage slike annonser selv.
 - Har en annonse feilaktig havnet under Solgt / borte, trykker du **Ikke solgt**.
 
+### Finne igjen en annonse
+
+Skriv i søkefeltet på **Nye funn**, for eksempel «stealth 3». Tallene på fanene (Nye, Skjulte, Solgt / borte, Kjøpt) viser da hvor mange treff det er i hver, så du ser hvor annonsen ligger.
+
 ### Rydding
 
 - **Skjul alle** i Nye funn skjuler alle annonsene som vises. Velg for eksempel «Eldre enn 14 dager» eller «La være» først, så skjuler du bare dem.
@@ -115,6 +119,10 @@ Prissjekken er forsiktig når den ikke har sikre tall:
 - **Tilbehør** og **Annet** (baller, traller, sett) blir alltid grå. Innholdet varierer for mye.
 - Sier ikke tittelen hva slags kølle det er (for eksempel bare «Ping G430 Max»), er typen gjettet ut fra søket. Da blir det høyst gult.
 - **Junior-, dame- og venstrehendte** køller sammenlignes bare med like køller, siden de selges for mindre.
+- **Tour- og samlerutgaver** (Circle T, GSS, Limited, Tour Only og lignende) sammenlignes bare med hverandre, så en vanlig Newport 2 ikke får prisen til en Circle T.
+- Spriker prisene mye (de dyreste koster minst dobbelt så mye som de billigste), bruker prissjekken den **lave delen** av prisene, og svaret blir høyst gult.
+- Koster annonsen **under halvparten av vanlig pris**, blir den gul med «Sjekk nøye». Det gjelder også når tittelen sier «pent brukt». Først når du selv har satt tilstanden under **Rett**, kan den bli grønn.
+- Ser et anslag helt feil ut, åpner du **Se hele prissjekken**. Der ser du hvilke annonser den sammenlignet med, og under **Ser anslaget helt feil ut?** finner du en tekst du kan kopiere og sende.
 
 Prissjekken viser også **den høyeste prisen du kan betale** og fortsatt oppfylle regelen. Den er nyttig når du forhandler.
 
