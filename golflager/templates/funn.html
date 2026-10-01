@@ -94,7 +94,7 @@
           {% else %}<span class="placeholder">Ingen bilde</span>{% endif %}
         </a>
         {% if sold %}
-          <div class="find__verdict">{{ flag('solgt', 'Solgt' if l.gone_reason == 'solgt' else 'Trolig solgt') }}</div>
+          <div class="find__verdict">{{ flag('solgt', 'Trolig solgt' if l.gone_reason == 'borte' else 'Solgt') }}</div>
         {% else %}
           <div class="find__verdict">{{ flag(r.color, r.label) }}</div>
         {% endif %}
@@ -109,7 +109,7 @@
           {% if sold %}
             {% set days = days_between(l.published_at or l.first_seen_at, l.gone_at) %}
             <p class="find__reason">
-              {% if l.gone_reason == 'solgt' %}Finn viser annonsen som solgt{% else %}Annonsen er ikke lenger på Finn{% endif %}
+              {% if l.gone_reason == 'solgt' %}Finn viser annonsen som solgt{% elif l.gone_reason == 'manuell' %}Du merket annonsen som solgt{% else %}Annonsen er ikke lenger på Finn{% endif %}
               (oppdaget {{ l.gone_at|tid_siden }}).{% if days is not none %} Den lå ute i <strong>{{ days }} {{ 'dag' if days == 1 else 'dager' }}</strong>.{% endif %}
             </p>
           {% elif r.expected_sale is not none and r.profit is not none %}
@@ -162,6 +162,10 @@
                 <input type="hidden" name="next" value="{{ here }}">
                 <button class="btn btn--danger" type="submit" title="Fjern annonsen for godt">Slett</button>
               </form>
+              <form class="inline" method="post" action="{{ url_for('main.funn_aktiv', listing_id=l.id) }}">
+                <input type="hidden" name="next" value="{{ here }}">
+                <button class="btn" type="submit" title="Annonsen er fortsatt til salgs">Ikke solgt</button>
+              </form>
             {% elif view == 'kjopt' %}
               {% if l.inventory_id %}<a class="btn btn--primary" href="{{ url_for('main.lager_endre', item_id=l.inventory_id) }}">Åpne i lageret</a>{% endif %}
             {% else %}
@@ -182,10 +186,14 @@
                   <input type="hidden" name="next" value="{{ here }}">
                   <button class="btn" type="submit">Skjul</button>
                 </form>
+                <form class="inline" method="post" action="{{ url_for('main.funn_solgt', listing_id=l.id) }}">
+                  <input type="hidden" name="next" value="{{ here }}">
+                  <button class="btn" type="submit" title="Annonsen er solgt på Finn">Solgt</button>
+                </form>
               {% endif %}
             {% endif %}
-            <a class="btn btn--ghost" href="{{ url_for('main.prissjekk', funn=l.id) }}" title="Se hele prissjekken">Detaljer</a>
           </div>
+          <a class="find__details" href="{{ url_for('main.prissjekk', funn=l.id) }}">Se hele prissjekken →</a>
         </div>
       </article>
     {% endfor %}

@@ -22,6 +22,9 @@ Golflager oppdager når annonser er solgt, uten å åpne enkeltannonser:
 - Søk med mer enn 5 sider kan ikke sjekkes. Gjør dem smalere, for eksempel med makspris.
 - Ser det ut som over halvparten av annonsene i et søk forsvant på én gang, merkes ingenting. Da er det trolig noe rart med svaret fra Finn.
 - Du kan endre hvor ofte, eller slå det av, under **Innstillinger → Scraper**.
+- **Se etter solgte nå** på Finn-søk-siden sjekker alle søkene med én gang, uten å vente.
+- Ser du at en annonse er solgt før Golflager oppdager det, trykker du **Solgt** på kortet. Under **Innstillinger → Feilsøking** finner du da en tekst som viser hvordan annonsen så ut i søket. Send den til den som lager appen, så kan Golflager lære å oppdage slike annonser selv.
+- Har en annonse feilaktig havnet under Solgt / borte, trykker du **Ikke solgt**.
 
 ### Rydding
 

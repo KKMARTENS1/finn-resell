@@ -33,6 +33,22 @@
     });
   });
 
+  // «Kopier teksten»-knapper
+  document.querySelectorAll("button[data-copy]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var field = document.querySelector(button.getAttribute("data-copy"));
+      if (!field) return;
+      var done = function () { button.textContent = "Kopiert!"; };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(field.value).then(done, function () {
+          field.select(); document.execCommand("copy"); done();
+        });
+      } else {
+        field.select(); document.execCommand("copy"); done();
+      }
+    });
+  });
+
   // Verktøytips på grafene
   var tip = document.getElementById("tooltip");
   function showTip(el) {

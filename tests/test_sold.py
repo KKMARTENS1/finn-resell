@@ -177,3 +177,85 @@ def test_old_database_gets_sold_columns(tmp_path):
     assert {"gone_at", "gone_reason"} <= listing_columns
     assert "last_full_check_at" in search_columns
     assert app.test_client().get("/funn?vis=borte").status_code == 200
+
+
+def test_more_ways_finn_can_mark_sold():
+    base = {"ad_id": 412345678, "heading": "Solgt: Stealth 3 wood", "price": {"amount": 1200}}
+    assert not ad_from_dict(base).sold  # «Solgt» i tittelen teller ikke
+    assert ad_from_dict({**base, "disposed": True}).sold
+    assert ad_from_dict({**base, "ad_status": "DISPOSED"}).sold
+    assert ad_from_dict({**base, "labels": [{"id": "x", "text": "Solgt"}]}).sold
+    assert not ad_from_dict({**base, "flags": ["private", "shipping_exists"]}).sold
+
+
+def test_check_for_sold_now_forces_full_check(search):
+    calls = []
+
+    def fetch(url):
+        calls.append(url)
+        return page(list(range(412300600, 412300650)))
+
+    now = datetime.now()
+    run_checks(search, fetch=fetch, sleep=no_sleep, now=now)
+    calls.clear()
+    run_checks(search, fetch=fetch, sleep=no_sleep, now=now + timedelta(minutes=5),
+               force_full=True)
+    assert len(calls) == 2  # blar gjennom hele søket selv om det ikke har gått 6 timer
+
+
+def test_worker_can_be_asked_for_full_check(db_path, search):
+    from golflager.scraper import ScraperWorker
+
+    calls = []
+    worker = ScraperWorker(db_path, fetch=lambda url: calls.append(url) or page(
+        list(range(412300700, 412300750))), sleep=no_sleep)
+    worker.tick()
+    calls.clear()
+    worker.request_run(full=True)
+    worker.tick()
+    assert len(calls) == 2
+
+
+def test_mark_as_sold_by_hand_with_diagnostics(client, search):
+    data = page([412300801, 412300802])
+    data = data.replace('"heading": "Scotty Cameron putter 412300802"',
+                        '"heading": "Scotty Cameron putter 412300802", "labels": '
+                        '[{"id": "ukjent_merke", "text": "Noe nytt"}]')
+    run_checks(search, fetch=lambda url: data, sleep=no_sleep)
+    listing_id = search.execute("SELECT id FROM listings WHERE finn_id = '412300802'"
+                                ).fetchone()[0]
+    response = client.post(f"/funn/{listing_id}/solgt", data={"next": "/funn"})
+    assert response.status_code == 302
+    row = search.execute("SELECT gone_reason FROM listings WHERE id = ?", (listing_id,)).fetchone()
+    assert row[0] == "manuell"
+    text = get_settings(search)["diagnostic_text"]
+    assert "412300802" in text and "Data fra søkesiden" in text and "Noe nytt" in text
+    html = client.get("/innstillinger").get_data(as_text=True)
+    assert "Feilsøking" in html and "Kopier teksten" in html
+    html = client.get("/funn?vis=borte").get_data(as_text=True)
+    assert "Du merket annonsen som solgt" in html
+    client.post(f"/funn/{listing_id}/aktiv")
+    assert search.execute("SELECT gone_at FROM listings WHERE id = ?",
+                          (listing_id,)).fetchone()[0] is None
+    client.post("/feilsoking/tom")
+    assert get_settings(search)["diagnostic_text"] == ""
+
+
+def test_diagnostics_when_ad_is_missing_from_search(client, search):
+    run_checks(search, fetch=lambda url: page([412300901]), sleep=no_sleep)
+    search.execute("""INSERT INTO listings (finn_id, search_id, title, price, url, first_seen_at,
+                      last_seen_at) VALUES ('412300999', 1, 'Borte', 100, 'u', '2026-09-01',
+                      '2026-09-01')""")
+    search.commit()
+    listing_id = search.execute("SELECT id FROM listings WHERE finn_id = '412300999'"
+                                ).fetchone()[0]
+    client.post(f"/funn/{listing_id}/solgt")
+    assert "var ikke med i de siste søkesidene" in get_settings(search)["diagnostic_text"]
+
+
+def test_check_sold_now_button(client, search, app):
+    calls = []
+    app.extensions["scraper"].request_run = lambda search_id=None, full=False: calls.append(full)
+    html = client.post("/scraper/solgte", follow_redirects=True).get_data(as_text=True)
+    assert calls == [True] and "Ser etter solgte annonser nå" in html
+    assert "Se etter solgte nå" in client.get("/sok").get_data(as_text=True)

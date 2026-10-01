@@ -340,28 +340,39 @@ def _location_from(d: Dict[str, Any]) -> str:
     return _first_str(d.get("local_area_name"), d.get("area"), d.get("municipality"))
 
 
-SOLD_WORDS = {"sold", "solgt", "is_sold", "sold_out"}
+SOLD_WORDS = {"sold", "solgt", "is_sold", "sold_out", "disposed", "disponert", "is_disposed"}
+SOLD_KEYS = {"sold", "is_sold", "issold", "disposed", "is_disposed", "isdisposed"}
+# Felt som er fritekst eller lenker. «Solgt» i tittelen betyr ikke at annonsen er solgt.
+NOT_STATUS_FIELDS = {"heading", "title", "name", "description", "body", "canonical_url", "url",
+                     "link", "href", "image", "image_urls", "images", "location"}
+
+
+def _has_sold_marker(value: Any, depth: int = 0) -> bool:
+    if depth > 4:
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() in SOLD_WORDS
+    if isinstance(value, list):
+        return any(_has_sold_marker(item, depth + 1) for item in value)
+    if isinstance(value, dict):
+        for key, item in value.items():
+            name = str(key).lower()
+            if name in NOT_STATUS_FIELDS:
+                continue
+            if name in SOLD_KEYS and item is True:
+                return True
+            if _has_sold_marker(item, depth + 1):
+                return True
+    return False
 
 
 def _is_sold(d: Dict[str, Any]) -> bool:
-    """Ser etter «Solgt»-merker i dataene Finn sender med søkeresultatene."""
-    if d.get("sold") is True or d.get("is_sold") is True:
-        return True
-    status = d.get("status") or d.get("ad_status")
-    if isinstance(status, str) and status.strip().lower() in SOLD_WORDS:
-        return True
-    flags = d.get("flags")
-    if isinstance(flags, list) and any(isinstance(f, str) and f.lower() in SOLD_WORDS
-                                       for f in flags):
-        return True
-    labels = d.get("labels")
-    if isinstance(labels, list):
-        for label in labels:
-            values = [label] if isinstance(label, str) else (
-                [label.get("id"), label.get("text")] if isinstance(label, dict) else [])
-            if any(isinstance(v, str) and v.strip().lower() in SOLD_WORDS for v in values):
-                return True
-    return False
+    """Ser etter «Solgt»-merker i dataene Finn sender med søkeresultatene.
+
+    Finn kan merke solgte annonser på flere måter (flagg, etiketter, status, «disposed»),
+    så vi leter gjennom alle feltene i annonsen unntatt tittel, beskrivelse og lenker.
+    """
+    return _has_sold_marker(d)
 
 
 def ad_from_dict(d: Dict[str, Any], base_url: str = "https://www.finn.no/") -> Optional[ParsedAd]:

@@ -25,6 +25,9 @@
         <form class="inline" method="post" action="{{ url_for('main.scraper_sjekk') }}">
           <button class="btn" type="submit" {% if scraper_running or not searches %}disabled{% endif %}>{{ icon('refresh', 16) }}Sjekk nå</button>
         </form>
+        <form class="inline" method="post" action="{{ url_for('main.scraper_solgte') }}">
+          <button class="btn" type="submit" {% if scraper_running or not searches %}disabled{% endif %}>Se etter solgte nå</button>
+        </form>
         <form class="inline" method="post" action="{{ url_for('main.scraper_av') }}">
           <button class="btn" type="submit">{{ icon('power', 16) }}Slå av</button>
         </form>

@@ -443,6 +443,7 @@ details.table-view table { margin-top: 10px; }
 .find__fix .field { margin-bottom: 8px; }
 .find__actions { display: flex; gap: 6px; margin-top: auto; flex-wrap: wrap; align-items: center; }
 .find__actions .btn--primary { flex: 1; }
+.find__details { font-size: 13px; margin-top: -2px; }
 
 .pager { display: flex; gap: 8px; justify-content: center; margin-top: 22px; align-items: center; }
 

@@ -99,6 +99,17 @@
       <a class="btn" href="{{ url_for('main.sikkerhetskopi') }}">Last ned sikkerhetskopi</a>
       <p class="hint">Ta gjerne en kopi av og til, og legg den i iCloud eller på en minnepinne.</p>
     </div>
+    {% if settings.diagnostic_text %}
+    <div class="card" id="feilsoking">
+      <h2 style="margin-bottom:8px">Feilsøking</h2>
+      <p class="small">Hvordan den siste annonsen du merket som solgt, så ut i søket på Finn. Kopier teksten og send den til den som lager appen, så kan Golflager lære å oppdage solgte annonser selv.</p>
+      <textarea id="diagnostic" readonly style="margin-top:10px; min-height:140px; font: 12px/1.4 ui-monospace, Menlo, monospace">{{ settings.diagnostic_text }}</textarea>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
+        <button class="btn btn--primary" type="button" data-copy="#diagnostic">Kopier teksten</button>
+        <button class="btn btn--ghost" type="submit" form="tom-form">Fjern</button>
+      </div>
+    </div>
+    {% endif %}
     <div class="card" id="oppdatering">
       <h2 style="margin-bottom:8px">Oppdatering</h2>
       <p class="small">Du har versjon <strong>{{ app_version }}</strong>.</p>
@@ -119,6 +130,7 @@
 </form>
 <form id="oppdater-form" method="post" action="{{ url_for('main.oppdater') }}" data-busy="Oppdaterer …"></form>
 <form id="sjekk-form" method="post" action="{{ url_for('main.oppdater_sjekk') }}" data-busy="Sjekker …"></form>
+<form id="tom-form" method="post" action="{{ url_for('main.feilsoking_tom') }}"></form>
 <form id="avslutt-form" method="post" action="{{ url_for('main.avslutt') }}"
       data-confirm="Slå av Golflager? Scraperen slutter å sjekke Finn til du starter Golflager igjen."></form>
 {% endblock %}

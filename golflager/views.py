@@ -446,6 +446,37 @@ def funn_slett(listing_id: int):
     return redirect(safe_next(url_for("main.funn")))
 
 
+@bp.route("/funn/<int:listing_id>/solgt", methods=["POST"])
+def funn_solgt(listing_id: int):
+    """Merk en annonse som solgt for hånd, og ta vare på hvordan den så ut i søket."""
+    from .diagnostics import describe_listing
+
+    conn = get_db()
+    listing = _listing_or_404(conn, listing_id)
+    conn.execute("UPDATE listings SET gone_at = ?, gone_reason = 'manuell' WHERE id = ?",
+                 (now_str(), listing_id))
+    try:
+        text = describe_listing(conn, listing, current_app.config.get("VERSION", "0"))
+    except Exception as exc:  # noqa: BLE001 - feilsøkingen skal aldri stoppe knappen
+        text = f"Klarte ikke å lage feilsøkingstekst: {exc}"
+    set_setting(conn, "diagnostic_text", text)
+    conn.commit()
+    flash("Annonsen er flyttet til «Solgt / borte». Vil du hjelpe Golflager å oppdage solgte "
+          "annonser selv? Gå til Innstillinger → Feilsøking og send teksten der.", "ok")
+    return redirect(safe_next(url_for("main.funn")))
+
+
+@bp.route("/funn/<int:listing_id>/aktiv", methods=["POST"])
+def funn_aktiv(listing_id: int):
+    conn = get_db()
+    _listing_or_404(conn, listing_id)
+    conn.execute("UPDATE listings SET gone_at = NULL, gone_reason = NULL WHERE id = ?",
+                 (listing_id,))
+    conn.commit()
+    flash("Annonsen er flyttet tilbake.", "ok")
+    return redirect(safe_next(url_for("main.funn")))
+
+
 @bp.route("/funn/<int:listing_id>/vis", methods=["POST"])
 def funn_vis(listing_id: int):
     conn = get_db()
@@ -1010,6 +1041,31 @@ def oppdater_sjekk():
         else:
             flash("Du har nyeste versjon.", "ok")
     return redirect(url_for("main.innstillinger", _anchor="oppdatering"))
+
+
+@bp.route("/scraper/solgte", methods=["POST"])
+def scraper_solgte():
+    """Se etter solgte annonser i alle søk nå, uten å vente på neste faste sjekk."""
+    conn = get_db()
+    if not get_settings(conn)["scraper_enabled"]:
+        flash("Slå på scraperen først.", "feil")
+    elif worker().running:
+        flash("Scraperen holder allerede på å sjekke.", "info")
+    elif not worker().can_run_manually(conn):
+        flash("Siste sjekk var for under to minutter siden. Vent litt, så vi ikke maser på Finn.",
+              "info")
+    else:
+        worker().request_run(full=True)
+        flash("Ser etter solgte annonser nå. Det tar noen sekunder per side.", "ok")
+    return redirect(url_for("main.sok"))
+
+
+@bp.route("/feilsoking/tom", methods=["POST"])
+def feilsoking_tom():
+    conn = get_db()
+    set_setting(conn, "diagnostic_text", "")
+    conn.commit()
+    return redirect(url_for("main.innstillinger"))
 
 
 @bp.route("/api/status")

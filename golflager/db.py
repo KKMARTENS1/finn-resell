@@ -123,6 +123,8 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     # Rydding i Nye funn (0 = aldri)
     "auto_hide_days": 30,
     "auto_delete_days": 60,
+    # Feilsøking: hvordan en annonse du merket som solgt, så ut i søket
+    "diagnostic_text": "",
     # Oppdateringer fra GitHub
     "update_available": "",
     "update_checked_at": "",

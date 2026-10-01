@@ -201,6 +201,22 @@ def store_ads(conn: sqlite3.Connection, search: sqlite3.Row, ads: Iterable[Parse
     return new, known
 
 
+def last_pages_dir(conn: sqlite3.Connection) -> Path:
+    db_file = conn.execute("PRAGMA database_list").fetchone()["file"]
+    base = Path(db_file).parent if db_file else Path.cwd()
+    return base / "feilsøking" / "siste-søk"
+
+
+def _save_last_page(conn: sqlite3.Connection, search_id: int, page: int, html: str) -> None:
+    """Tar vare på den siste søkesiden per søk (overskrives hver gang), til feilsøking."""
+    try:
+        folder = last_pages_dir(conn)
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / f"søk-{search_id}-side-{page}.html").write_text(html, encoding="utf-8")
+    except OSError:
+        pass
+
+
 def _save_debug_copy(conn: sqlite3.Connection, html: str, label: str) -> str:
     """Lagrer siden Finn sendte, så det er lett å finne ut hva som skjedde."""
     try:
@@ -265,6 +281,7 @@ def run_checks(
     sleep: Callable[[float], None] = time.sleep,
     should_continue: Callable[[], bool] = lambda: True,
     now: Optional[datetime] = None,
+    force_full: bool = False,
 ) -> Dict[str, int]:
     settings = get_settings(conn)
     searches: List[sqlite3.Row] = conn.execute(
@@ -280,7 +297,7 @@ def run_checks(
     first_request = True
     for search in searches:
         # Av og til blar vi gjennom hele søket for å se hvilke annonser som er borte (solgt)
-        full = _full_check_due(search, sold_hours, now)
+        full = force_full or _full_check_due(search, sold_hours, now)
         started = now_str()
         found = new_here = 0
         seen_ids: Set[str] = set()
@@ -293,6 +310,7 @@ def run_checks(
             first_request = False
             url = page_url(search["url"], page)
             html = fetch(url)
+            _save_last_page(conn, search["id"], page, html)
             result = parse_search_page(html, url)
             if not result.ads:
                 if looks_blocked(html):
@@ -383,6 +401,7 @@ class ScraperWorker:
         self._only: Set[int] = set()
         self._network_failures = 0
         self._last_cleanup = 0.0
+        self._force_full = False
         self._thread: Optional[threading.Thread] = None
 
     def start(self) -> None:
@@ -393,10 +412,11 @@ class ScraperWorker:
     def wake(self) -> None:
         self._wake.set()
 
-    def request_run(self, search_id: Optional[int] = None) -> None:
+    def request_run(self, search_id: Optional[int] = None, full: bool = False) -> None:
         with self._lock:
             if search_id is None:
                 self._manual = True
+                self._force_full = self._force_full or full
             else:
                 self._only.add(search_id)
         self._wake.set()
@@ -453,8 +473,8 @@ class ScraperWorker:
         try:
             settings = get_settings(conn)
             with self._lock:
-                manual, only = self._manual, set(self._only)
-                self._manual, self._only = False, set()
+                manual, only, force_full = self._manual, set(self._only), self._force_full
+                self._manual, self._only, self._force_full = False, set(), False
             if not settings["scraper_enabled"]:
                 return
             now = now or datetime.now()
@@ -473,6 +493,7 @@ class ScraperWorker:
                     fetch=self.fetch,
                     sleep=self.sleep,
                     should_continue=lambda: bool(get_settings(conn)["scraper_enabled"]),
+                    force_full=force_full,
                 )
                 self._network_failures = 0
                 message = (
