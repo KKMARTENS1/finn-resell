@@ -3,10 +3,13 @@ from __future__ import annotations
 
 TYPES = [
     ("driver", "Driver"),
+    ("fairway", "Fairwaykølle"),
+    ("hybrid", "Hybrid"),
     ("putter", "Putter"),
     ("jernsett", "Jernsett"),
     ("wedge", "Wedge"),
     ("bag", "Bag"),
+    ("deler", "Deler"),
     ("annet", "Annet"),
 ]
 TYPE_LABELS = dict(TYPES)

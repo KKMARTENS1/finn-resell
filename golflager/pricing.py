@@ -17,6 +17,11 @@ from .classify import normalize
 from .constants import IN_STOCK
 
 
+def _num(value: float) -> str:
+    """1234567 -> «1 234 567» (bare tallet, så kommaene i setningen får stå)."""
+    return f"{int(value):,}".replace(",", " ")
+
+
 @dataclass
 class Comparable:
     label: str
@@ -213,7 +218,7 @@ class PriceData:
             what = {"exact": "samme modell", "similar": "lignende modell",
                     "broad": "samme merke og type"}[chosen_level]
             result.basis = f"Basert på {n} {'eget salg' if n == 1 else 'egne salg'} ({what})."
-            result.confidence = "lav" if chosen_level == "broad" else "god"
+            result.confidence = "god" if chosen_level == "exact" else "lav"
         elif chosen_source == "marked":
             adjust = condition_factor(s, condition)
             comps = [Comparable(
@@ -233,10 +238,12 @@ class PriceData:
                     "broad": "samme merke og type"}[chosen_level]
             result.basis = (
                 f"Basert på {n} {'annonse' if n == 1 else 'annonser'} på Finn ({what}). "
-                f"Typisk utlagt pris er {int(typical):,} kr, og vi regner med at du får "
-                f"{s['sale_factor_pct']:g} % av det.".replace(",", " ")
+                f"Typisk utlagt pris er {_num(typical)} kr, og vi regner med at du får "
+                f"{s['sale_factor_pct']:g} % av det."
             )
-            if chosen_level == "broad" or n < min_comp:
+            # Bare samme modell gir et sikkert svar. «Stealth» og «Stealth 2 Plus» koster ulikt,
+            # og deler (hoder, skaft) varierer for mye til at utlagte priser er nok.
+            if chosen_level != "exact" or n < min_comp or type_key == "deler":
                 result.confidence = "lav"
             else:
                 result.confidence = "god"
@@ -293,16 +300,21 @@ class PriceData:
             if result.suspicious:
                 result.color, result.label = "gul", "Sjekk tilstand"
                 result.reason = (
-                    f"Uvanlig billig: vanlig pris er rundt {result.typical_price:,} kr. Det betyr "
-                    "ofte skader eller mye slitasje. Se nøye på bildene, og sett tilstanden hvis "
-                    "den er dårlig.".replace(",", " ")
+                    f"Uvanlig billig: vanlig pris er rundt {_num(result.typical_price)} kr. Det betyr ofte "
+                    "skader eller mye slitasje. Se nøye på bildene, og sett tilstanden hvis den "
+                    "er dårlig."
                 )
             elif result.confidence == "god":
                 result.color, result.label = "gronn", "Kjøp"
                 result.reason = "Oppfyller regelen din."
             else:
                 result.color, result.label = "gul", "Kanskje"
-                result.reason = "Oppfyller regelen din, men det finnes lite å sammenligne med."
+                result.reason = (
+                    "Oppfyller regelen din, men det finnes lite å sammenligne med."
+                    if chosen_level == "exact" and type_key != "deler" else
+                    "Oppfyller regelen din, men sammenligningen er usikker (ikke helt samme "
+                    "modell, eller deler)."
+                )
         else:
             result.decision = "La være"
             if near:
@@ -320,7 +332,7 @@ class PriceData:
         budget = int(s["budget_kr"])
         if budget > 0 and self.bound_now + total_cost > budget:
             result.notes.append(
-                f"Kjøpet gjør at du får {self.bound_now + total_cost:,} kr bundet i lager, "
-                f"som er over budsjettet ditt på {budget:,} kr.".replace(",", " ")
+                f"Kjøpet gjør at du får {_num(self.bound_now + total_cost)} kr bundet i lager, "
+                f"som er over budsjettet ditt på {_num(budget)} kr."
             )
         return result

@@ -329,3 +329,36 @@ def test_overview_links_to_categories(client, filled):
     html = client.get("/").get_data(as_text=True)
     assert 'href="/lager?status=solgt&amp;type=putter"' in html
     assert 'href="/lager?status=solgt&amp;merke=Scotty+Cameron"' in html
+
+
+def test_old_listings_are_reclassified_once(tmp_path):
+    import sqlite3
+
+    from golflager import create_app
+
+    path = tmp_path / "gammel.db"
+    create_app(str(path), start_scraper=False)
+    conn = sqlite3.connect(path)
+    rows = [("1", "TaylorMade Stealth driver hode", "TaylorMade", "Stealth", "driver", 0),
+            ("2", "TaylorMade Stealth 3 wood", "TaylorMade", "Stealth 3", "annet", 0),
+            ("3", "Ping driver + 3-tre", "Ping", "", "driver", 0),
+            ("4", "Ping G425 Max driver", "Ping", "G425 Max", "driver", 0),
+            ("5", "Scotty Cameron hode", "Scotty Cameron", "", "putter", 1)]
+    for finn_id, title, brand, model, type_, manual in rows:
+        conn.execute("""INSERT INTO listings (finn_id, title, url, brand, model, type, manual_class,
+                        first_seen_at, last_seen_at) VALUES (?, ?, 'u', ?, ?, ?, ?, 'x', 'x')""",
+                     (finn_id, title, brand, model, type_, manual))
+    conn.execute("UPDATE settings SET value = '1' WHERE key = 'classify_version'")
+    conn.commit()
+    create_app(str(path), start_scraper=False)
+    result = {r[0]: (r[1], r[2]) for r in conn.execute("SELECT finn_id, type, model FROM listings")}
+    assert result == {"1": ("deler", "Stealth"), "2": ("fairway", "Stealth"),
+                      "3": ("annet", ""), "4": ("driver", "G425 Max"), "5": ("putter", "")}
+
+
+def test_correcting_a_find_protects_it(client, filled, conn):
+    listing_id = conn.execute("SELECT id FROM listings WHERE finn_id = '200'").fetchone()[0]
+    client.post(f"/funn/{listing_id}/rett", data={"brand": "Ping", "model": "Anser",
+                                                 "type": "putter"})
+    assert conn.execute("SELECT manual_class FROM listings WHERE id = ?",
+                        (listing_id,)).fetchone()[0] == 1

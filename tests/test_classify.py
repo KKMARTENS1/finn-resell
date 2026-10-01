@@ -17,9 +17,9 @@ from golflager.classify import classify, detect_condition, is_wanted_ad, normali
         ("Vokey SM8 52.08", ("Titleist", "Vokey SM8", "wedge")),
         ("Odyssey White Hot OG #7 putter", ("Odyssey", "White Hot OG #7", "putter")),
         ("Sun Mountain C-130 vognbag", ("Sun Mountain", "C-130", "bag")),
-        ("Scotty Cameron headcover putter", ("Scotty Cameron", "", "annet")),
+        ("Scotty Cameron headcover putter", ("Scotty Cameron", "", "deler")),
         ("Scotty Cameron putter med headcover", ("Scotty Cameron", "", "putter")),
-        ("Callaway Rogue fairway 3", ("Callaway", "Rogue", "annet")),
+        ("Callaway Rogue fairway 3", ("Callaway", "Rogue", "fairway")),
         ("Titleist 7-jern T200", ("Titleist", "", "annet")),
     ],
 )
@@ -31,7 +31,7 @@ def test_defaults_from_search_are_used_when_title_is_vague():
     assert classify("Newport 2, 35 tommer", "Scotty Cameron", "putter") == (
         "Scotty Cameron", "Newport 2", "putter")
     # Tydelig type i tittelen vinner over standardtypen
-    assert classify("Scotty Cameron headcover", "", "putter")[2] == "annet"
+    assert classify("Scotty Cameron headcover", "", "putter")[2] == "deler"
 
 
 def test_normalize_makes_spellings_match():
@@ -62,3 +62,33 @@ def test_wanted_ads_are_detected():
 ])
 def test_condition_from_title(title, expected):
     assert detect_condition(title) == expected
+
+
+@pytest.mark.parametrize("title, expected", [
+    # Deler: hoder, skaft, headcovers og grep sammenlignes ikke med hele køller
+    ("TaylorMade Stealth driver hode", ("TaylorMade", "Stealth", "deler")),
+    ("Ping G425 Max driverhode 10.5", ("Ping", "G425 Max", "deler")),
+    ("Titleist TSR3 driver, kun hode", ("Titleist", "TSR3", "deler")),
+    ("Callaway Paradym driver uten skaft", ("Callaway", "Paradym", "deler")),
+    ("Fujikura Ventus Blue 6S driverskaft", ("Fujikura", "Ventus Blue 6S", "deler")),
+    ("Ventus TR Blue skaft til TaylorMade driver", ("TaylorMade", "", "deler")),
+    ("Driver shaft Tensei AV Blue 65 stiff", ("", "", "deler")),
+    ("TaylorMade driver headcover", ("TaylorMade", "", "deler")),
+    ("Golf Pride grep 13 stk", ("Golf Pride", "", "deler")),
+    # Hele køller med skaft, grep eller headcover er fortsatt hele køller
+    ("TaylorMade Stealth 2 driver med Ventus skaft", ("TaylorMade", "Stealth 2", "driver")),
+    ("Scotty Cameron Newport 2 putter m/headcover", ("Scotty Cameron", "Newport 2", "putter")),
+    ("Scotty Cameron putter med SuperStroke grep", ("Scotty Cameron", "", "putter")),
+    ("Mizuno JPX 923 jernsett med KBS skaft", ("Mizuno", "JPX 923", "jernsett")),
+    ("Jernsett med Dynamic Gold skaft", ("", "", "jernsett")),
+    ("Driver med bulk i hodet", ("", "", "driver")),
+    # Fairway, hybrid og pakker
+    ("TaylorMade Stealth 3 wood", ("TaylorMade", "Stealth", "fairway")),
+    ("TaylorMade Stealth 2 Plus 3-wood", ("TaylorMade", "Stealth 2 Plus", "fairway")),
+    ("Titleist TSR2 3w", ("Titleist", "TSR2", "fairway")),
+    ("Ping G425 hybrid 4", ("Ping", "G425", "hybrid")),
+    ("TaylorMade Stealth driver + 3-tre", ("TaylorMade", "Stealth", "annet")),
+    ("Ping driver og putter", ("Ping", "", "annet")),
+])
+def test_parts_bundles_and_wood_types(title, expected):
+    assert classify(title) == expected

@@ -45,7 +45,22 @@ BRANDS: List[Tuple[str, List[str]]] = [
     ("Bushnell", [r"\bbushnell\b"]),
     ("FootJoy", [r"\bfoot\s*joy\b"]),
     ("Ecco", [r"\becco\b"]),
+    # Skaft og grep
+    ("Fujikura", [r"\bfujikura\b"]),
+    ("Mitsubishi Chemical", [r"\bmitsubishi\b"]),
+    ("Project X", [r"\bproject\s*x\b"]),
+    ("Graphite Design", [r"\bgraphite\s+design\b"]),
+    ("Aldila", [r"\baldila\b"]),
+    ("UST Mamiya", [r"\bust\s+mamiya\b", r"\bmamiya\b"]),
+    ("KBS", [r"\bkbs\b"]),
+    ("True Temper", [r"\btrue\s*temper\b"]),
+    ("Nippon", [r"\bnippon\b"]),
+    ("Golf Pride", [r"\bgolf\s*pride\b"]),
+    ("Lamkin", [r"\blamkin\b"]),
+    ("SuperStroke", [r"\bsuper\s*stroke\b"]),
 ]
+PART_BRANDS = {"Fujikura", "Mitsubishi Chemical", "Project X", "Graphite Design", "Aldila",
+               "UST Mamiya", "KBS", "True Temper", "Nippon", "Golf Pride", "Lamkin", "SuperStroke"}
 _BRAND_RES = [(name, [re.compile(p, re.IGNORECASE) for p in pats]) for name, pats in BRANDS]
 
 # Undermerker som hører til modellnavnet (f.eks. "Vokey SM9" hos Titleist).
@@ -82,11 +97,9 @@ _TYPE_PATTERNS: List[Tuple[str, str]] = [
         r"jernsett|jern\s*sett|iron\s*set|\birons\b|\bjern\b"
         r"|\b[3-7]\s*-\s*(?:pw|p|gw|aw|sw|9)\b|\b[3-7]\s*til\s*(?:pw|p)\b",
     ),
-    (
-        "annet",
-        r"fairway|\bhybrid|\brescue\b|\butility\b|\b[2-9][\s-]?(?:wood|tre|jern|iron)\b"
-        r"|\bskaft\b|\bshaft\b",
-    ),
+    ("fairway", r"fairway|\b[2-9][\s-]?(?:wood|tre)\b|\bfw\b|\b[2-9]w\b"),
+    ("hybrid", r"\bhybrid|\brescue\b|\butility\b"),
+    ("annet", r"\b[2-9][\s-]?(?:jern|iron)\b|\bskaft\b|\bshaft\b"),
 ]
 _TYPE_RES = [(t, re.compile(p, re.IGNORECASE)) for t, p in _TYPE_PATTERNS]
 
@@ -132,9 +145,10 @@ def detect_type(title: str) -> Optional[str]:
 
 _TYPE_WORD_RE = re.compile(
     r"putter|driver|wedge|jern|irons?\b|bag$|bagger?\b|fairway|hybrid|headcover|hodetrekk"
-    r"|tralle|golfsett",
+    r"|tralle|golfsett|^\d?-?wood$|^tre$|^\d-tre$|^\dw$|^hode$|^head$|^cover$|^skaft$|^shaft$",
     re.IGNORECASE,
 )
+_CLUB_NUMBER_WORDS = {"wood", "tre", "-wood", "-tre", "jern", "iron", "hybrid", "rescue", "w"}
 
 
 def _is_spec_token(token: str) -> bool:
@@ -163,7 +177,10 @@ def extract_model(title: str, brand_span: Optional[Tuple[int, int]] = None) -> s
         text = title
     tokens = text.split()
     model: List[str] = []
-    for raw in tokens:
+    for position, raw in enumerate(tokens):
+        following = tokens[position + 1].lower().strip(",.;:") if position + 1 < len(tokens) else ""
+        if raw.isdigit() and len(raw) == 1 and following in _CLUB_NUMBER_WORDS:
+            break  # «3 wood», «4 hybrid»: tallet hører til køllen, ikke modellen
         token = raw.strip("()[]{}!?;\"'*")
         ends_clause = raw.endswith((",", ".", ";", ":", ")"))
         token = token.rstrip(",.;:")
@@ -191,10 +208,74 @@ def _is_known_brand_word(word: str) -> bool:
     return False
 
 
+# Ord som betyr at noe følger MED en kølle («driver med headcover»), ikke at det selges alene
+_WITH_RE = re.compile(r"(?:\bmed\b|\bm/|\binkl\.?|\binkludert\b|\bog\b|\+|\bsamt\b|\bwith\b"
+                      r"|\bincl\.?)[^,.;:]{0,30}$", re.IGNORECASE)
+_HEAD_RE = re.compile(
+    r"\b(?:kun\s+|bare\s+)?(?:driver|fairway|hybrid|kølle|putter)?hode\b|\bclub\s*head\b"
+    r"|\bhead\s+only\b|\b(?:driver|fairway|hybrid)\s+head\b(?!\s*cover)|\buten\s+skaft\b"
+    r"|\bwithout\s+shaft\b|\bu/\s*skaft\b", re.IGNORECASE)
+_SHAFT_RE = re.compile(
+    r"\b(?:driver|fairway|hybrid|tre|wood|jern|iron)?(?:skaft|shaft)s?\s+(?:til|for|to)\b"
+    r"|\b(?:driver|fairway|hybrid|wood|jern|iron)(?:skaft|shaft)\b"
+    r"|\b(?:driver|fairway|hybrid)\s+(?:skaft|shaft)\b|\b(?:kun|bare|løst|løse)\s+(?:skaft|shaft)\b"
+    r"|^\s*(?:skaft|shaft)\b", re.IGNORECASE)
+_COVER_RE = re.compile(r"\bhead\s*covers?\b|\bhodetrekk\b|\bcovers?\b|\btrekk\b", re.IGNORECASE)
+_GRIP_RE = re.compile(r"\bgrep\b|\bgrips?\b", re.IGNORECASE)
+_TOOL_RE = re.compile(r"\badapter\b|\bsleeve\b|\bskrunøkkel\b|\bwrench\b|\bvekter\b"
+                      r"|\bweights\b", re.IGNORECASE)
+_CLUB_WORDS = {
+    "driver": re.compile(r"\bdriver\b(?!\s*(?:head\s*)?cover)|\b1[\s-]?(?:wood|tre)\b", re.I),
+    "fairway": re.compile(r"fairway|\b[2-9][\s-]?(?:wood|tre)\b|\bfw\b|\b[2-9]w\b", re.I),
+    "hybrid": re.compile(r"\bhybrid|\brescue\b|\butility\b", re.I),
+    "putter": re.compile(r"\bputter\b(?!\s*(?:head\s*)?cover)", re.I),
+    "jern": re.compile(r"jernsett|\bjern\b|\birons\b", re.I),
+    "wedge": re.compile(r"\bwedger?\b", re.I),
+}
+
+
+def _alone(pattern: "re.Pattern[str]", title: str) -> bool:
+    """Treff som ikke står etter «med», «inkl.», «og» osv."""
+    for match in pattern.finditer(title):
+        if not _WITH_RE.search(title[:match.start()]):
+            return True
+    return False
+
+
+def detect_part(title: str) -> Optional[str]:
+    """Hoder, skaft, headcovers, grep og annet tilbehør som selges uten hel kølle."""
+    if _HEAD_RE.search(title) and not _WITH_RE.search(title[:_HEAD_RE.search(title).start()]):
+        return "hode"
+    if _SHAFT_RE.search(title):
+        return "skaft"
+    if _alone(_COVER_RE, title):
+        return "headcover"
+    if _alone(_GRIP_RE, title) and not any(p.search(title) for p in _CLUB_WORDS.values()):
+        return "grep"
+    if _alone(_TOOL_RE, title) and not any(p.search(title) for p in _CLUB_WORDS.values()):
+        return "tilbehør"
+    return None
+
+
+def is_bundle(title: str) -> bool:
+    """Flere typer køller i samme annonse («driver + 3-tre»)."""
+    return sum(1 for pattern in _CLUB_WORDS.values() if pattern.search(title)) >= 2
+
+
 def classify(title: str, default_brand: str = "", default_type: str = "") -> Tuple[str, str, str]:
     """Returnerer (merke, modell, type) for en annonsetittel."""
     brand, span = detect_brand(title)
     type_key = detect_type(title) or default_type or "annet"
+    if brand in PART_BRANDS and span is not None:
+        # Skaft- og grepmerker først i tittelen betyr at det er skaftet/grepet som selges
+        if len(title[:span[0]].split()) <= 1:
+            type_key = "deler"
+        else:
+            brand, span = None, None
+    if detect_part(title):
+        type_key = "deler"
+    elif type_key != "deler" and is_bundle(title):
+        type_key = "annet"
     model = extract_model(title, span)
     return brand or default_brand or "", model, type_key
 

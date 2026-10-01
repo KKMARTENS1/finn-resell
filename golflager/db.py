@@ -70,7 +70,8 @@ CREATE TABLE IF NOT EXISTS listings (
     last_seen_at  TEXT NOT NULL,
     inventory_id  INTEGER REFERENCES inventory(id) ON DELETE SET NULL,
     gone_at       TEXT,
-    gone_reason   TEXT
+    gone_reason   TEXT,
+    manual_class  INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status, first_seen_at);
 
@@ -182,6 +183,7 @@ def init_db(path: str) -> None:
             "INSERT OR IGNORE INTO settings(key, value) VALUES ('secret_key', ?)",
             (secrets.token_hex(24),),
         )
+        _reclassify(conn)
         conn.commit()
     finally:
         conn.close()
@@ -202,9 +204,42 @@ def _migrate(conn: sqlite3.Connection) -> None:
     for column in ("gone_at", "gone_reason"):
         if column not in columns:
             conn.execute(f"ALTER TABLE listings ADD COLUMN {column} TEXT")
+    if "manual_class" not in columns:
+        conn.execute("ALTER TABLE listings ADD COLUMN manual_class INTEGER NOT NULL DEFAULT 0")
     search_columns = {row["name"] for row in conn.execute("PRAGMA table_info(searches)")}
     if "last_full_check_at" not in search_columns:
         conn.execute("ALTER TABLE searches ADD COLUMN last_full_check_at TEXT")
+
+
+CLASSIFY_VERSION = 2
+
+
+def _reclassify(conn: sqlite3.Connection) -> None:
+    """Gir eldre annonser riktig type når gjenkjenningen blir bedre.
+
+    Versjon 2: deler (hoder, skaft, headcovers, grep), pakker, fairwaykøller og hybrider.
+    Annonser du har rettet selv, endres aldri.
+    """
+    row = conn.execute("SELECT value FROM settings WHERE key = 'classify_version'").fetchone()
+    if row is not None and int(row["value"]) >= CLASSIFY_VERSION:
+        return
+    from .classify import classify, is_bundle
+
+    rows = conn.execute(
+        """SELECT l.id, l.title, l.type, l.brand, s.default_brand, s.default_type
+           FROM listings l LEFT JOIN searches s ON s.id = l.search_id
+           WHERE l.manual_class = 0"""
+    ).fetchall()
+    for listing in rows:
+        brand, model, type_key = classify(listing["title"], listing["default_brand"] or "",
+                                          listing["default_type"] or "")
+        changed = type_key in ("deler", "fairway", "hybrid") or (
+            type_key == "annet" and is_bundle(listing["title"]))
+        if changed and type_key != listing["type"]:
+            conn.execute("UPDATE listings SET type = ?, model = ?, brand = ? WHERE id = ?",
+                         (type_key, model, brand or listing["brand"], listing["id"]))
+    conn.execute("INSERT OR REPLACE INTO settings(key, value) VALUES ('classify_version', ?)",
+                 (str(CLASSIFY_VERSION),))
 
 
 def _convert(raw: Optional[str], default: Any) -> Any:

@@ -44,7 +44,7 @@ def test_market_prices_with_sale_factor(conn):
     assert r.extra_costs == 150  # standard
     assert r.profit == 2700 - 1500 - 150
     assert r.color == "gronn"
-    assert "utlagt pris" in r.basis
+    assert "Typisk utlagt pris er 3 000 kr, og vi regner" in r.basis
 
 
 def test_few_market_prices_give_yellow(conn):
@@ -115,7 +115,8 @@ def test_budget_note(conn):
     for i in range(3):
         add_listing(conn, 8000 + i, "Ping Anser", 3000, "Ping", "Anser", "putter")
     r = check(conn, brand="Ping", model="Anser", type_key="putter", price=1000)
-    assert any("over budsjettet" in note for note in r.notes)
+    assert any("3 650 kr bundet i lager, som er over budsjettet ditt på 3 000 kr" in note
+               for note in r.notes)
 
 
 def test_worn_listing_is_valued_lower(conn):
@@ -138,8 +139,33 @@ def test_suspiciously_cheap_with_unknown_condition_is_yellow(conn):
     r = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=1200)
     assert r.meets_rule and r.suspicious
     assert r.color == "gul" and r.label == "Sjekk tilstand"
-    assert "Uvanlig billig" in r.reason
+    assert "Uvanlig billig: vanlig pris er rundt 3 000 kr" in r.reason
+    assert "bildene, og sett" in r.reason
     # Når du har sett bildene og satt tilstanden, er det ikke lenger mistenkelig
     r = check(conn, brand="Scotty Cameron", model="Newport 2", type_key="putter", price=1200,
               condition=3)
     assert not r.suspicious and r.color == "gronn"
+
+
+def test_similar_model_is_never_green(conn):
+    for i in range(5):
+        add_listing(conn, 9300 + i, "TaylorMade Stealth 2 Plus driver", 4000, "TaylorMade",
+                    "Stealth 2 Plus", "driver")
+    r = check(conn, brand="TaylorMade", model="Stealth", type_key="driver", price=2200)
+    assert r.meets_rule and not r.suspicious
+    assert r.confidence == "lav" and r.color == "gul"
+    assert "usikker" in r.reason
+
+
+def test_parts_are_compared_with_parts_only_and_never_green(conn):
+    for i in range(5):
+        add_listing(conn, 9400 + i, "TaylorMade Stealth driver", 3500, "TaylorMade", "Stealth",
+                    "driver")
+    # Et hode sammenlignes ikke med hele drivere
+    r = check(conn, brand="TaylorMade", model="Stealth", type_key="deler", price=1200)
+    assert r.expected_sale is None
+    for i in range(5):
+        add_listing(conn, 9500 + i, "TaylorMade Stealth driver hode", 1500, "TaylorMade",
+                    "Stealth", "deler")
+    r = check(conn, brand="TaylorMade", model="Stealth", type_key="deler", price=600)
+    assert r.expected_sale == 1350 and r.color == "gul"

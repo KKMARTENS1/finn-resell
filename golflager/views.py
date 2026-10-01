@@ -498,7 +498,8 @@ def funn_rett(listing_id: int):
     if condition is not None:
         condition = max(1, min(5, condition))
     conn.execute(
-        "UPDATE listings SET brand = ?, model = ?, type = ?, condition = ? WHERE id = ?",
+        "UPDATE listings SET brand = ?, model = ?, type = ?, condition = ?, manual_class = 1 "
+        "WHERE id = ?",
         (request.form.get("brand", "").strip(), request.form.get("model", "").strip(), type_key,
          condition, listing_id),
     )

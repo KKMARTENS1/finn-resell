@@ -12,6 +12,12 @@ Dette får du:
 
 På **Nye funn**, **Lager** og **Markedspriser** kan du bla etter **type** (putter, driver, jernsett …) og **merke**. Hver knapp viser hvor mange det er, og valgene kan kombineres, for eksempel «Putter» + «Scotty Cameron». Med **Sorter** kan du ordne listene etter for eksempel pris, fortjeneste eller alder.
 
+Typene er driver, fairwaykølle, hybrid, putter, jernsett, wedge, bag, **deler** og annet:
+
+- **Deler** er løse hoder («driverhode»), skaft, headcovers og grep. En driver «med skaft» eller «inkl. headcover» er fortsatt en driver.
+- **Fairwaykølle** og **hybrid** har egne typer, så en 3-wood ikke blir sammenlignet med drivere.
+- Annonser med flere køller (for eksempel «driver og 3-wood» eller et helt sett) havner under **Annet**.
+
 ### Solgte annonser
 
 Golflager oppdager når annonser er solgt, uten å åpne enkeltannonser:
@@ -70,7 +76,7 @@ Macen sperrer mappene Dokumenter, Skrivebord og Nedlastinger for programmer som 
 
 1. **Legg inn et Finn-søk.** Gjør et søk på finn.no, for eksempel på «Scotty Cameron» med makspris 3000 kr. Kopier adressen fra adressefeltet i nettleseren, gå til **Finn-søk** i appen og lim den inn.
 2. **Vent litt.** Scraperen sjekker det nye søket med én gang, og etter det hvert 30. minutt. Nye annonser dukker opp under **Nye funn**.
-3. **Ta stilling.** Trykk **Kjøpt** for å flytte en annonse rett inn i lageret, eller **Skjul** hvis den ikke er interessant. Har appen gjettet feil merke, modell eller type, trykker du **Rett**.
+3. **Ta stilling.** Trykk **Kjøpt** for å flytte en annonse rett inn i lageret, eller **Skjul** hvis den ikke er interessant. Har appen gjettet feil merke, modell eller type, trykker du **Rett**. Det du retter, blir stående, også når appen senere oppdateres.
 4. **Hold lageret oppdatert.** Registrer ekstra kostnader (grep, frakt, rengjøring), og sett status til **Solgt** med salgspris når tingen er solgt. Da blir tallene på forsiden riktige, og prissjekken lærer av dine egne salg.
 5. **Sjekk innstillingene.** Sett budsjettet ditt og regelen for når noe er verdt å kjøpe.
 
@@ -98,6 +104,11 @@ Fargene betyr:
 - 🟢 **Kjøp:** oppfyller regelen, og det finnes nok å sammenligne med.
 - 🟡 **Kanskje:** oppfyller regelen, men med lite data. Eller: gir litt fortjeneste, men under kravet ditt.
 - 🔴 **La være:** tap eller for lav fortjeneste.
+
+Prissjekken er forsiktig når den ikke har sikre tall:
+
+- Bare **samme modell** kan gi grønt. Er sammenligningen med lignende modeller (for eksempel «Stealth» mot «Stealth 2 Plus»), blir det høyst gult.
+- **Deler** sammenlignes bare med andre deler og blir aldri grønne, fordi prisene på hoder og skaft varierer for mye.
 
 Prissjekken viser også **den høyeste prisen du kan betale** og fortsatt oppfylle regelen. Den er nyttig når du forhandler.
 
