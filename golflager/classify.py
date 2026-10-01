@@ -61,20 +61,37 @@ BRANDS: List[Tuple[str, List[str]]] = [
 ]
 PART_BRANDS = {"Fujikura", "Mitsubishi Chemical", "Project X", "Graphite Design", "Aldila",
                "UST Mamiya", "KBS", "True Temper", "Nippon", "Golf Pride", "Lamkin", "SuperStroke"}
+# Merker som bare lager tilbehør (traller, klokker, sko). Uten typeord i tittelen er det tilbehør.
+ACCESSORY_BRANDS = {"Motocaddy", "PowaKaddy", "Clicgear", "JuCad", "Garmin", "Bushnell",
+                    "FootJoy", "Ecco"}
 _BRAND_RES = [(name, [re.compile(p, re.IGNORECASE) for p in pats]) for name, pats in BRANDS]
 
 # Undermerker som hører til modellnavnet (f.eks. "Vokey SM9" hos Titleist).
 _MODEL_PREFIX_WORDS = {"vokey"}
 
 # Typeord. Ordet som står først i tittelen vinner, så "putter med headcover" blir putter,
-# mens "headcover til putter" blir annet.
+# mens "headcover til putter" blir deler, og "driver + 12 baller" blir driver.
 _TYPE_PATTERNS: List[Tuple[str, str]] = [
+    ("deler", r"head\s*covers?|hodetrekk|\bcovers?\b"),
+    (
+        "tilbehor",
+        # Baller (også modellnavn som Pro V1 og Chrome Soft)
+        r"golfball\w*|\bballer\b|\bballs?\b|\w*balls\b|lake\s*ball\w*|\bballene?\b"
+        r"|\bdusin\b|\bdozen\b|ballmark\w*"
+        r"|\bpro\s*v1x?\b|\bprov1x?\b|chrome\s*soft|\btp5x?\b"
+        r"|\b[zq][\s-]?star\b|super\s*soft|soft\s*feel|\bavx\b"
+        # Traller, måleutstyr, sko, hansker, klær og treningsutstyr
+        r"|golftralle|\w*tralle\b|trolley|golfvogn|\bvogn\b|push\s*cart|golfbil"
+        r"|avstandsmåler|rangefinder|\blaser\b|\bgps\b|golfklokke|golf\s*watch"
+        r"|golfsko|\bsko\b|\bspikes?\b|hanske\w*|\bgloves?\b"
+        r"|\w*jakke\b|regntøy|\w*bukse\b|\bgenser\b|\bskjorte\b|\bpolo\b|\bcaps?\b|\blue\b"
+        r"|\bskjørt\b|\bshorts\b|paraply|umbrella|håndkle|towel|\btees\b|golftees?"
+        r"|puttematte|putte\s*matte|slagmatte|treningsnett|chipping\s*net|\bsimulator\b"
+        r"|launch\s*monitor",
+    ),
     (
         "annet",
-        r"head\s*covers?|hodetrekk|\bcovers?\b|golftralle|\btralle\b|trolley|golfvogn|\bvogn\b"
-        r"|avstandsmåler|rangefinder|golfsko|\bsko\b|hanske|golfballer|\bballer\b|\bballs?\b"
-        r"|\bgps\b|paraply|puttematte|putte\s*matte|treningsnett|golfsett|halvsett"
-        r"|komplett\s+sett|nybegynnersett|juniorsett|startsett",
+        r"golfsett|halvsett|komplett\s+sett|nybegynnersett|juniorsett|startsett",
     ),
     (
         "bag",
@@ -83,8 +100,8 @@ _TYPE_PATTERNS: List[Tuple[str, str]] = [
     ),
     (
         "putter",
-        r"putter|\bnewport\b|\bphantom\b|\bspider\b|two[\s-]?ball|\banser\b|white\s*hot"
-        r"|\bfutura\b|\bsquareback\b|\bfastback\b|\bgolo\b|\bdel\s*mar\b",
+        r"putter|\bnewport\b|\bphantom\b|\bspider\b|(?:\btwo|\b2)[\s-]?ball\b|\banser\b"
+        r"|white\s*hot|\bfutura\b|\bsquareback\b|\bfastback\b|\bgolo\b|\bdel\s*mar\b",
     ),
     (
         "wedge",
@@ -113,7 +130,8 @@ _STOP_WORDS = {
     "sett", "set", "fairway", "hybrid", "wood", "golf", "kølle", "køller", "ønskes", "kjøpt",
     "kjøpes", "inkl", "inkl.", "inkludert", "lite", "nesten", "original", "originalt", "the",
     "x-stiff", "strøken", "strøkent", "fin", "fint", "god", "godt", "tilstand", "loft",
-    "lengde", "lie", "grader", "herrer", "damer", "komplett", "demo",
+    "lengde", "lie", "grader", "herrer", "damer", "komplett", "demo", "stk", "stk.", "dusin",
+    "pk", "pakke", "nye/brukte", "jr", "barn", "kids", "lady", "women",
 }
 _LEADING_SKIP = {"selges", "selger", "pent", "brukt", "ny", "nye", "nytt", "strøken", "by",
                  "fra", "from", "golf", "-", "–", "|", "/", ":"}
@@ -145,7 +163,9 @@ def detect_type(title: str) -> Optional[str]:
 
 _TYPE_WORD_RE = re.compile(
     r"putter|driver|wedge|jern|irons?\b|bag$|bagger?\b|fairway|hybrid|headcover|hodetrekk"
-    r"|tralle|golfsett|^\d?-?wood$|^tre$|^\d-tre$|^\dw$|^hode$|^head$|^cover$|^skaft$|^shaft$",
+    r"|tralle|golfsett|^\d?-?wood$|^tre$|^\d-tre$|^\dw$|^hode$|^head$|^cover$|^skaft$|^shaft$"
+    r"|golfball|^baller$|^ballene?$|trolley|^sko$|golfsko|hanske|^gloves?$|jakke$"
+    r"|bukse$|avstandsmåler|rangefinder",
     re.IGNORECASE,
 )
 _CLUB_NUMBER_WORDS = {"wood", "tre", "-wood", "-tre", "jern", "iron", "hybrid", "rescue", "w"}
@@ -262,10 +282,10 @@ def is_bundle(title: str) -> bool:
     return sum(1 for pattern in _CLUB_WORDS.values() if pattern.search(title)) >= 2
 
 
-def classify(title: str, default_brand: str = "", default_type: str = "") -> Tuple[str, str, str]:
-    """Returnerer (merke, modell, type) for en annonsetittel."""
+def _read_title(title: str) -> Tuple[Optional[str], Optional[Tuple[int, int]], Optional[str]]:
+    """Merke, hvor merket står, og typen tittelen selv viser (None hvis den ikke sier det)."""
     brand, span = detect_brand(title)
-    type_key = detect_type(title) or default_type or "annet"
+    type_key = detect_type(title)
     if brand in PART_BRANDS and span is not None:
         # Skaft- og grepmerker først i tittelen betyr at det er skaftet/grepet som selges
         if len(title[:span[0]].split()) <= 1:
@@ -274,10 +294,42 @@ def classify(title: str, default_brand: str = "", default_type: str = "") -> Tup
             brand, span = None, None
     if detect_part(title):
         type_key = "deler"
-    elif type_key != "deler" and is_bundle(title):
+    elif type_key not in ("deler", "tilbehor") and is_bundle(title):
         type_key = "annet"
+    elif type_key is None and brand in ACCESSORY_BRANDS:
+        type_key = "tilbehor"
+    return brand, span, type_key
+
+
+def title_type(title: str) -> Optional[str]:
+    """Typen tittelen viser. None når typen bare kan gjettes ut fra søket."""
+    return _read_title(title or "")[2]
+
+
+def classify(title: str, default_brand: str = "", default_type: str = "") -> Tuple[str, str, str]:
+    """Returnerer (merke, modell, type) for en annonsetittel."""
+    brand, span, type_key = _read_title(title)
     model = extract_model(title, span)
-    return brand or default_brand or "", model, type_key
+    return brand or default_brand or "", model, type_key or default_type or "annet"
+
+
+# Junior-, dame- og venstrehendte køller har sine egne priser og sammenlignes bare med hverandre.
+_VARIANT_RES = [
+    ("junior", re.compile(r"\bjunior\w*|\bjr\b|\bbarne\w*|\bbarn\b|\bkids?\b", re.I)),
+    ("dame", re.compile(r"\bdame\w*|\bladies\b|\blady\b|\bwomen'?s?\b|\bkvinne\w*", re.I)),
+    ("venstre", re.compile(r"\bvenstre\w*|\bleft[\s-]?hand\w*|\blh\b|\bkeivhendt\w*", re.I)),
+]
+_VARIANT_WHO = {"junior": "juniorer", "dame": "damer", "venstre": "venstrehendte"}
+
+
+def detect_variant(title: str) -> str:
+    """«junior», «dame», «venstre» (eller flere, med komma). Tom tekst = vanlig herrekølle."""
+    return ",".join(name for name, pattern in _VARIANT_RES if pattern.search(title or ""))
+
+
+def variant_who(variant: str) -> str:
+    """«junior,venstre» -> «juniorer og venstrehendte»."""
+    return " og ".join(_VARIANT_WHO[v] for v in variant.split(",") if v in _VARIANT_WHO)
 
 
 WANTED_RE = re.compile(

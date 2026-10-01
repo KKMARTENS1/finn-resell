@@ -397,6 +397,8 @@ details.table-view table { margin-top: 10px; }
 .flag--gronn .flag__cloth { fill: var(--go); }
 .flag--gul .flag__cloth { fill: var(--maybe); }
 .flag--rod .flag__cloth { fill: var(--stop); }
+.flag--gra { background: var(--surface-2); color: var(--ink-2); }
+.flag--gra .flag__cloth { fill: var(--muted); }
 .flag--solgt { background: var(--surface-2); color: var(--ink-2); }
 .flag--solgt .flag__cloth { fill: var(--muted); }
 .flag__pole { stroke: currentColor; }
@@ -413,6 +415,7 @@ details.table-view table { margin-top: 10px; }
 .find--gronn::before { background: var(--go); }
 .find--gul::before { background: var(--maybe); }
 .find--rod::before { background: var(--stop); }
+.find--gra::before { background: var(--muted); }
 .find--solgt::before { background: var(--muted); }
 .find--solgt .find__img img { filter: grayscale(.6); opacity: .85; }
 .find__img { display: block; aspect-ratio: 4 / 3; background: var(--surface-2); position: relative; overflow: hidden; }
@@ -491,6 +494,7 @@ tfoot td { font-weight: 700; border-top: 1px solid var(--line-strong); border-bo
 .verdict--gronn { border-top: 5px solid var(--go); }
 .verdict--gul { border-top: 5px solid var(--maybe); }
 .verdict--rod { border-top: 5px solid var(--stop); }
+.verdict--gra { border-top: 5px solid var(--muted); }
 .verdict__decision { font-family: var(--display); font-size: 44px; font-weight: 750; line-height: 1; margin: 12px 0 8px; letter-spacing: -0.02em; }
 .verdict__reason { color: var(--ink-2); }
 .verdict__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; margin: 20px 0 16px; }

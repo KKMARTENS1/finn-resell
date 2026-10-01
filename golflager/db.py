@@ -211,13 +211,14 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE searches ADD COLUMN last_full_check_at TEXT")
 
 
-CLASSIFY_VERSION = 2
+CLASSIFY_VERSION = 3
 
 
 def _reclassify(conn: sqlite3.Connection) -> None:
     """Gir eldre annonser riktig type når gjenkjenningen blir bedre.
 
     Versjon 2: deler (hoder, skaft, headcovers, grep), pakker, fairwaykøller og hybrider.
+    Versjon 3: tilbehør (baller, traller, sko, klær), som før kunne få typen fra søket.
     Annonser du har rettet selv, endres aldri.
     """
     row = conn.execute("SELECT value FROM settings WHERE key = 'classify_version'").fetchone()
@@ -233,7 +234,7 @@ def _reclassify(conn: sqlite3.Connection) -> None:
     for listing in rows:
         brand, model, type_key = classify(listing["title"], listing["default_brand"] or "",
                                           listing["default_type"] or "")
-        changed = type_key in ("deler", "fairway", "hybrid") or (
+        changed = type_key in ("deler", "fairway", "hybrid", "tilbehor") or (
             type_key == "annet" and is_bundle(listing["title"]))
         if changed and type_key != listing["type"]:
             conn.execute("UPDATE listings SET type = ?, model = ?, brand = ? WHERE id = ?",

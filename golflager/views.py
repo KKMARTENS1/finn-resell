@@ -16,11 +16,11 @@ from flask import (Blueprint, abort, current_app, flash, g, jsonify, redirect, r
                    request, send_file, url_for)
 
 from . import stats, updater
-from .classify import normalize
+from .classify import normalize, title_type
 from .constants import (CONDITION_LABELS, CONDITIONS, IN_STOCK, LISTING_STATUSES, STATUS_LABELS,
                         STATUSES, TYPE_LABELS, TYPES, VERDICTS)
 from .db import (LIMITS, connect, get_settings, log_event, now_str, set_setting, today_str)
-from .pricing import PriceData, rule_text
+from .pricing import PriceCheck, PriceData, rule_text
 from .scraper import normalize_search_url, suggest_name
 
 bp = Blueprint("main", __name__)
@@ -217,6 +217,15 @@ def enrich_item(item: Dict[str, Any]) -> Dict[str, Any]:
 # Oversikt
 
 
+def check_listing(prices: PriceData, row: sqlite3.Row) -> PriceCheck:
+    """Prissjekk for en annonse fra Finn. Typen regnes som sikker bare hvis tittelen sier
+    hva det er, eller du har rettet annonsen selv."""
+    type_known = bool(row["manual_class"]) or title_type(row["title"]) is not None
+    return prices.check(row["brand"], row["model"], row["type"], row["price"],
+                        condition=row["condition"], exclude_listing_id=row["id"],
+                        title=row["title"], type_known=type_known)
+
+
 @bp.route("/")
 def oversikt():
     conn = get_db()
@@ -229,8 +238,7 @@ def oversikt():
     prices = PriceData(conn, settings)
     best = []
     for row in rows:
-        check = prices.check(row["brand"], row["model"], row["type"], row["price"],
-                             condition=row["condition"], exclude_listing_id=row["id"])
+        check = check_listing(prices, row)
         if check.color == "gronn":
             best.append({"listing": row, "check": check})
         if len(best) >= 4:
@@ -252,6 +260,10 @@ FIND_SORTS = [
 ]
 
 
+# «Eldre enn …»-valget på Nye funn, så du kan skjule eller slette bare de gamle annonsene.
+FIND_AGES = [(7, "Eldre enn 7 dager"), (14, "Eldre enn 14 dager"), (30, "Eldre enn 30 dager")]
+
+
 def _sort_value(value: Optional[float], descending: bool) -> Tuple[bool, float]:
     """Sorteringsnøkkel der manglende verdier alltid havner sist."""
     if value is None:
@@ -266,10 +278,13 @@ def sort_cards(cards: List[Dict[str, Any]], sort_key: str) -> List[Dict[str, Any
     if sort_key in ("pris_lav", "pris_hoy"):
         return sorted(cards, key=lambda c: _sort_value(c["listing"]["price"],
                                                        sort_key == "pris_hoy"))
+    # Grå annonser har bare et grovt anslag, så de havner sist når du sorterer på fortjeneste.
     if sort_key == "fortjeneste":
-        return sorted(cards, key=lambda c: _sort_value(c["check"].profit, True))
+        return sorted(cards, key=lambda c: _sort_value(
+            None if c["check"].color == "gra" else c["check"].profit, True))
     if sort_key == "prosent":
-        return sorted(cards, key=lambda c: _sort_value(c["check"].profit_pct, True))
+        return sorted(cards, key=lambda c: _sort_value(
+            None if c["check"].color == "gra" else c["check"].profit_pct, True))
     return cards
 
 
@@ -290,6 +305,9 @@ def filtered_finds(conn: sqlite3.Connection, args: Any) -> Dict[str, Any]:
         view = "ny"
     color = args.get("farge", "")
     search_filter = parse_int(args.get("sok"))
+    age = parse_int(args.get("alder"))
+    if age not in dict(FIND_AGES):
+        age = None
     sort_key = args.get("sorter", "nyeste")
     if sort_key not in dict(FIND_SORTS):
         sort_key = "nyeste"
@@ -300,19 +318,21 @@ def filtered_finds(conn: sqlite3.Connection, args: Any) -> Dict[str, Any]:
     if search_filter:
         query += " AND l.search_id = ?"
         params.append(search_filter)
+    if age:
+        cutoff = (datetime.now() - timedelta(days=age)).isoformat(sep=" ", timespec="seconds")
+        query += " AND COALESCE(l.published_at, l.first_seen_at) < ?"
+        params.append(cutoff)
     query += " ORDER BY l.first_seen_at DESC, COALESCE(l.published_at, '') DESC, l.id DESC"
     rows = conn.execute(query, params).fetchall()
 
     prices = PriceData(conn, settings)
     selected_type, selected_brand = selected_category()
-    checked = [{"listing": row, "check": prices.check(
-        row["brand"], row["model"], row["type"], row["price"], condition=row["condition"],
-        exclude_listing_id=row["id"])} for row in rows]
+    checked = [{"listing": row, "check": check_listing(prices, row)} for row in rows]
     facets = category_facets(
         [c for c in checked if not color or c["check"].color == color],
         lambda c: c["listing"]["type"], lambda c: c["listing"]["brand"],
         selected_type, selected_brand)
-    counts = {"gronn": 0, "gul": 0, "rod": 0}
+    counts = {key: 0 for key in VERDICTS}
     cards = []
     for card in checked:
         listing = card["listing"]
@@ -324,6 +344,7 @@ def filtered_finds(conn: sqlite3.Connection, args: Any) -> Dict[str, Any]:
         cards.append(card)
     return {
         "view": view, "color": color, "search_filter": search_filter, "sort": sort_key,
+        "age": age,
         "cards": sort_cards(cards, sort_key), "counts": counts, "cat": facets,
         "settings": settings,
     }
@@ -355,6 +376,8 @@ def funn():
         view=view,
         color=found["color"],
         search_filter=found["search_filter"],
+        age=found["age"],
+        ages=FIND_AGES,
         sort=found["sort"],
         sorts=FIND_SORTS,
         searches=searches,
@@ -760,10 +783,14 @@ def prissjekk():
     result = None
     if form["brand"] or form["price"] is not None:
         prices = PriceData(conn, settings)
+        from_listing = listing is not None and not args.get("merke")
         result = prices.check(
             form["brand"], form["model"], form["type"], form["price"],
             condition=form["condition"], extra_costs=form["extras"],
             exclude_listing_id=listing["id"] if listing is not None else None,
+            title=listing["title"] if listing is not None else "",
+            type_known=(not from_listing or bool(listing["manual_class"])
+                        or title_type(listing["title"]) is not None),
         )
     return render_template("prissjekk.html", form=form, result=result, listing=listing,
                            brands=known_values(conn, "brand"), models=known_values(conn, "model"))

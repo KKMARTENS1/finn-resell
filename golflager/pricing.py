@@ -3,7 +3,11 @@
 Rekkefølge for sammenligning:
 1. Dine egne salg av samme merke, modell og type.
 2. Markedsprisene (utlagte priser på Finn), ganget med salgsfaktoren.
-3. Hvis modellen ikke finnes: samme merke og type (grovt anslag, merkes som usikkert).
+3. Hvis modellen ikke finnes: samme merke og type. Det er bare et grovt anslag, så annonsen
+   blir grå («Usikker») i stedet for å anbefales.
+
+Junior-, dame- og venstrehendte køller sammenlignes bare med like køller. Tilbehør og «annet»
+(baller, traller, sett) varierer for mye til å vurderes automatisk.
 """
 from __future__ import annotations
 
@@ -13,8 +17,15 @@ from datetime import datetime, timedelta
 from statistics import median
 from typing import Any, Dict, List, Optional
 
-from .classify import normalize
+from .classify import detect_variant, normalize, variant_who
 from .constants import IN_STOCK
+
+# Typer der innholdet varierer så mye (antall baller, hva som følger med et sett) at
+# utlagte priser ikke sier noe om hva akkurat denne annonsen er verdt.
+UNRATED_TYPES = ("tilbehor", "annet")
+TYPE_PLURALS = {"driver": "drivere", "fairway": "fairwaykøller", "hybrid": "hybrider",
+                "putter": "puttere", "jernsett": "jernsett", "wedge": "wedger", "bag": "bagger",
+                "deler": "deler"}
 
 
 def _num(value: float) -> str:
@@ -42,13 +53,14 @@ class PriceCheck:
     profit: Optional[int] = None
     profit_pct: Optional[float] = None
     meets_rule: bool = False
-    color: str = "gul"  # gronn / gul / rod
+    color: str = "gul"  # gronn / gul / rod / gra (for usikkert til å si noe)
     decision: str = "Usikker"
     label: str = "Kanskje"
     reason: str = ""
     basis: str = ""
     source: str = ""  # salg / marked / ""
-    confidence: str = "ingen"  # god / lav / ingen
+    confidence: str = "ingen"  # god / lav / grov / ingen
+    uncertainty: str = ""  # hvorfor svaret er usikkert (vises når annonsen blir gul)
     max_price: Optional[int] = None
     condition: Optional[int] = None  # None = ukjent
     typical_price: Optional[int] = None
@@ -74,6 +86,12 @@ def _model_match(query_key: str, candidate_key: str) -> Optional[str]:
 SUSPICIOUS_SHARE = 0.5
 
 
+def _unrated_reason(type_key: str) -> str:
+    what = "tilbehør" if type_key == "tilbehor" else "sett og blandede annonser"
+    return (f"Golflager vurderer ikke {what} automatisk, fordi innholdet varierer for mye "
+            "(antall baller, hva som følger med osv.). Sjekk prisen selv.")
+
+
 def condition_factor(settings: Dict[str, Any], condition: Optional[int]) -> float:
     """Verdi i forhold til samme ting i «God» stand (tilstand 3)."""
     if not condition or condition == 3:
@@ -95,13 +113,14 @@ class PriceData:
     def __init__(self, conn: sqlite3.Connection, settings: Dict[str, Any]) -> None:
         self.settings = settings
         self.sold = [dict(r) for r in conn.execute(
-            """SELECT id, brand, model, type, condition, sale_price, sale_date, finn_url,
+            """SELECT id, brand, model, type, condition, sale_price, sale_date, finn_url, notes,
                       cost_grip + cost_shipping + cost_cleaning + cost_other AS extras
                FROM inventory WHERE status = 'solgt' AND sale_price > 0"""
         )]
         for item in self.sold:
             item["brand_key"] = normalize(item["brand"])
             item["model_key"] = normalize(item["model"])
+            item["variant"] = detect_variant(f"{item['model']} {item['notes']}")
         since = (datetime.now() - timedelta(days=30 * int(settings["market_months"]))).isoformat(
             sep=" ", timespec="seconds"
         )
@@ -114,6 +133,7 @@ class PriceData:
         for item in self.market:
             item["brand_key"] = normalize(item["brand"])
             item["model_key"] = normalize(item["model"])
+            item["variant"] = detect_variant(item["title"])
         self.extras_by_type: Dict[str, float] = {}
         grouped: Dict[str, List[int]] = {}
         for item in self.sold:
@@ -135,12 +155,14 @@ class PriceData:
         return int(self.settings["default_extra_cost"])
 
     def _own_sales(self, brand_key: str, model_key: str, type_key: str, level: str,
-                   exclude_inventory_id: Optional[int]) -> List[Dict[str, Any]]:
+                   exclude_inventory_id: Optional[int], variant: str = "") -> List[Dict[str, Any]]:
         out = []
         for item in self.sold:
             if item["id"] == exclude_inventory_id:
                 continue
             if item["type"] != type_key or item["brand_key"] != brand_key:
+                continue
+            if item["variant"] != variant:
                 continue
             match = _model_match(model_key, item["model_key"])
             if level == "broad" or match == level:
@@ -148,13 +170,15 @@ class PriceData:
         return out
 
     def _market(self, brand_key: str, model_key: str, type_key: str, level: str,
-                exclude_listing_id: Optional[int]) -> List[Dict[str, Any]]:
+                exclude_listing_id: Optional[int], variant: str = "") -> List[Dict[str, Any]]:
         out = []
         for item in self.market:
             if item["id"] == exclude_listing_id:
                 continue
             if item["type"] != type_key or item["brand_key"] != brand_key:
                 continue
+            if item["variant"] != variant:
+                continue  # juniorkøller sammenlignes bare med juniorkøller osv.
             match = _model_match(model_key, item["model_key"])
             if level == "broad" or match == level:
                 out.append(item)
@@ -170,9 +194,18 @@ class PriceData:
         extra_costs: Optional[int] = None,
         exclude_listing_id: Optional[int] = None,
         exclude_inventory_id: Optional[int] = None,
+        title: str = "",
+        type_known: bool = True,
     ) -> PriceCheck:
+        """Sjekker én ting.
+
+        `title` er annonsetittelen (brukes til å se om det er junior-, dame- eller
+        venstrehendt). `type_known` er False når tittelen ikke sier hva slags kølle det er,
+        og typen bare er gjettet ut fra søket. Da blir svaret aldri grønt.
+        """
         s = self.settings
         brand_key, model_key = normalize(brand), normalize(model)
+        variant = detect_variant(title)
         factor = float(s["sale_factor_pct"]) / 100
         min_comp = int(s["min_comparables"])
         result = PriceCheck(price=price, condition=condition)
@@ -187,10 +220,10 @@ class PriceData:
             for source, level in tiers:
                 if source == "salg":
                     rows = self._own_sales(brand_key, model_key, type_key, level,
-                                           exclude_inventory_id)
+                                           exclude_inventory_id, variant)
                 else:
                     rows = self._market(brand_key, model_key, type_key, level,
-                                        exclude_listing_id)
+                                        exclude_listing_id, variant)
                 if rows:
                     chosen, chosen_source, chosen_level = rows, source, level
                     break
@@ -218,7 +251,9 @@ class PriceData:
             what = {"exact": "samme modell", "similar": "lignende modell",
                     "broad": "samme merke og type"}[chosen_level]
             result.basis = f"Basert på {n} {'eget salg' if n == 1 else 'egne salg'} ({what})."
-            result.confidence = "god" if chosen_level == "exact" else "lav"
+            result.confidence = {"exact": "god", "similar": "lav"}.get(chosen_level, "grov")
+            if chosen_level == "similar":
+                result.uncertainty = "salgene den sammenlignes med, er ikke helt samme modell"
         elif chosen_source == "marked":
             adjust = condition_factor(s, condition)
             comps = [Comparable(
@@ -243,11 +278,30 @@ class PriceData:
             )
             # Bare samme modell gir et sikkert svar. «Stealth» og «Stealth 2 Plus» koster ulikt,
             # og deler (hoder, skaft) varierer for mye til at utlagte priser er nok.
-            if chosen_level != "exact" or n < min_comp or type_key == "deler":
+            if chosen_level == "broad" or type_key in UNRATED_TYPES:
+                result.confidence = "grov"
+            elif chosen_level == "similar":
                 result.confidence = "lav"
+                result.uncertainty = "annonsene den sammenlignes med, er ikke helt samme modell"
+            elif type_key == "deler":
+                result.confidence = "lav"
+                result.uncertainty = "prisene på deler varierer mye"
+            elif n < min_comp:
+                result.confidence = "lav"
+                result.uncertainty = "det finnes lite å sammenligne med"
             else:
                 result.confidence = "god"
         result.source = chosen_source
+        if result.confidence == "god" and not type_known:
+            result.confidence = "lav"
+            result.uncertainty = ("tittelen sier ikke hva slags kølle det er, så typen er "
+                                  "gjettet ut fra søket")
+        if variant:
+            result.notes.append(
+                f"Tittelen tyder på at dette er for {variant_who(variant)}. Den sammenlignes "
+                "bare med like annonser, og det er ofte færre kjøpere, så det kan ta lengre "
+                "tid å selge."
+            )
 
         result.extra_costs = (
             int(extra_costs) if extra_costs is not None else self.estimate_extras(type_key)
@@ -255,15 +309,21 @@ class PriceData:
 
         if price is None:
             result.reason = "Annonsen har ingen pris, så fortjenesten kan ikke regnes ut."
-            result.color, result.label, result.decision = "gul", "Ukjent pris", "Usikker"
+            result.color, result.label, result.decision = "gra", "Ukjent pris", "Usikker"
             return result
         if result.expected_sale is None:
-            result.reason = (
-                "Fant ingen egne salg eller annonser å sammenligne med. "
-                "Sjekk prisen selv, eller legg inn merke og modell."
-                if brand_key else "Merket er ukjent, så det finnes ingenting å sammenligne med."
-            )
-            result.color, result.label, result.decision = "gul", "Ingen data", "Usikker"
+            if type_key in UNRATED_TYPES:
+                result.reason = _unrated_reason(type_key)
+            elif not brand_key:
+                result.reason = "Merket er ukjent, så det finnes ingenting å sammenligne med."
+            elif variant:
+                result.reason = (f"Fant ingen andre annonser for {variant_who(variant)} å "
+                                 "sammenligne med (samme merke og type). Sjekk prisen selv.")
+            else:
+                result.reason = ("Fant ingen egne salg eller annonser å sammenligne med. "
+                                 "Sjekk prisen selv, eller legg inn merke og modell.")
+            label = "Usikker" if type_key in UNRATED_TYPES else "Ingen data"
+            result.color, result.label, result.decision = "gra", label, "Usikker"
             return result
 
         expected = result.expected_sale
@@ -295,7 +355,18 @@ class PriceData:
             and price < result.typical_price * SUSPICIOUS_SHARE
         )
 
-        if result.meets_rule:
+        if result.confidence == "grov":
+            # Et grovt anslag skal ikke se ut som en anbefaling, verken grønn eller gul.
+            result.color, result.label, result.decision = "gra", "Usikker", "Vurder selv"
+            if type_key in UNRATED_TYPES:
+                result.reason = _unrated_reason(type_key)
+            else:
+                plural = TYPE_PLURALS.get(type_key, "ting")
+                result.reason = (
+                    f"Fant ingenting for samme modell, bare andre {plural} fra {brand}. "
+                    "Det er for grovt til å si om den lønner seg. Sjekk prisen selv."
+                )
+        elif result.meets_rule:
             result.decision = "Kjøp"
             if result.suspicious:
                 result.color, result.label = "gul", "Sjekk tilstand"
@@ -309,12 +380,8 @@ class PriceData:
                 result.reason = "Oppfyller regelen din."
             else:
                 result.color, result.label = "gul", "Kanskje"
-                result.reason = (
-                    "Oppfyller regelen din, men det finnes lite å sammenligne med."
-                    if chosen_level == "exact" and type_key != "deler" else
-                    "Oppfyller regelen din, men sammenligningen er usikker (ikke helt samme "
-                    "modell, eller deler)."
-                )
+                because = result.uncertainty or "det finnes lite å sammenligne med"
+                result.reason = f"Oppfyller regelen din, men {because}."
         else:
             result.decision = "La være"
             if near:

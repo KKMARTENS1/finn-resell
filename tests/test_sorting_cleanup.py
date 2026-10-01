@@ -130,3 +130,17 @@ def test_settings_for_cleanup(client, conn):
     client.post("/innstillinger", data={"auto_hide_days": "14", "auto_delete_days": "0"})
     settings = get_settings(conn)
     assert settings["auto_hide_days"] == 14 and settings["auto_delete_days"] == 0
+
+
+def test_age_filter_lets_you_hide_only_old_finds(client, conn):
+    old = (datetime.now() - timedelta(days=20)).isoformat(sep=" ", timespec="seconds")
+    add_listing(conn, 820001, "Gammel Ping Anser putter", 900, "Ping", "Anser", "putter")
+    add_listing(conn, 820002, "Ny Ping Anser putter", 900, "Ping", "Anser", "putter")
+    conn.execute("UPDATE listings SET first_seen_at = ?, published_at = ? WHERE finn_id = '820001'",
+                 (old, old))
+    conn.commit()
+    html = client.get("/funn?alder=14").get_data(as_text=True)
+    assert "Gammel Ping Anser" in html and "Ny Ping Anser" not in html
+    client.post("/funn/rydd?alder=14", data={"handling": "skjul"})
+    statuses = dict(conn.execute("SELECT finn_id, status FROM listings").fetchall())
+    assert statuses == {"820001": "skjult", "820002": "ny"}

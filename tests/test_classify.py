@@ -1,6 +1,7 @@
 import pytest
 
-from golflager.classify import classify, detect_condition, is_wanted_ad, normalize
+from golflager.classify import (classify, detect_condition, detect_variant, is_wanted_ad,
+                                normalize, title_type)
 
 
 @pytest.mark.parametrize(
@@ -92,3 +93,40 @@ def test_condition_from_title(title, expected):
 ])
 def test_parts_bundles_and_wood_types(title, expected):
     assert classify(title) == expected
+
+
+@pytest.mark.parametrize("title, default_type, expected", [
+    ("Titleist Pro V1 golfballer 12 stk", "hybrid", "tilbehor"),
+    ("Titleist Pro V1 12 stk", "hybrid", "tilbehor"),
+    ("Callaway Chrome Soft 2 dusin", "driver", "tilbehor"),
+    ("Lakeballs 50 stk", "hybrid", "tilbehor"),
+    ("Motocaddy M1 elektrisk tralle", "", "tilbehor"),
+    ("Garmin Approach S62", "driver", "tilbehor"),
+    ("FootJoy golfsko str 43", "", "tilbehor"),
+    ("Bushnell Tour V5 avstandsmåler", "", "tilbehor"),
+    ("Callaway hybrid 4 + 12 baller", "", "hybrid"),
+    ("Odyssey 2-Ball putter", "", "putter"),
+    ("Odyssey Two Ball", "", "putter"),
+    ("Golfsett komplett med bag", "", "annet"),
+])
+def test_accessories(title, default_type, expected):
+    assert classify(title, "", default_type)[2] == expected
+
+
+def test_title_type_is_none_when_only_the_search_knows():
+    assert title_type("Ping G430 Max") is None
+    assert title_type("Ping G430 Max driver") == "driver"
+    assert title_type("Titleist Pro V1") == "tilbehor"
+
+
+@pytest.mark.parametrize("title, expected", [
+    ("Ping G425 driver", ""),
+    ("Ping G425 venstre driver", "venstre"),
+    ("Scotty Cameron Newport 2 LH", "venstre"),
+    ("Callaway Big Bertha dame driver", "dame"),
+    ("Ladies Ping G Le2 driver", "dame"),
+    ("US Kids juniorsett", "junior"),
+    ("TaylorMade Junior driver venstrehendt", "junior,venstre"),
+])
+def test_variants(title, expected):
+    assert detect_variant(title) == expected

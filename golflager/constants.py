@@ -10,6 +10,7 @@ TYPES = [
     ("wedge", "Wedge"),
     ("bag", "Bag"),
     ("deler", "Deler"),
+    ("tilbehor", "Tilbehør"),
     ("annet", "Annet"),
 ]
 TYPE_LABELS = dict(TYPES)
@@ -43,4 +44,5 @@ VERDICTS = {
     "gronn": "Kjøp",
     "gul": "Kanskje",
     "rod": "La være",
+    "gra": "Usikker",
 }

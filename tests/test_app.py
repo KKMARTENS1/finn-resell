@@ -309,8 +309,8 @@ def test_finds_can_be_filtered_by_type_and_brand(client, mixed):
 
 
 def test_category_links_keep_other_choices(client, mixed):
-    html = client.get("/funn?vis=ny&farge=gul&type=putter").get_data(as_text=True)
-    assert 'href="/funn?vis=ny&amp;farge=gul&amp;type=putter&amp;merke=Ping"' in html
+    html = client.get("/funn?vis=ny&farge=gra&type=putter").get_data(as_text=True)
+    assert 'href="/funn?vis=ny&amp;farge=gra&amp;type=putter&amp;merke=Ping"' in html
     assert 'href="/funn?vis=ny&amp;type=putter"' in html  # «Alle» i fargevalget beholder typen
 
 
@@ -343,7 +343,8 @@ def test_old_listings_are_reclassified_once(tmp_path):
             ("2", "TaylorMade Stealth 3 wood", "TaylorMade", "Stealth 3", "annet", 0),
             ("3", "Ping driver + 3-tre", "Ping", "", "driver", 0),
             ("4", "Ping G425 Max driver", "Ping", "G425 Max", "driver", 0),
-            ("5", "Scotty Cameron hode", "Scotty Cameron", "", "putter", 1)]
+            ("5", "Scotty Cameron hode", "Scotty Cameron", "", "putter", 1),
+            ("6", "Titleist Pro V1 12 stk", "Titleist", "Pro V1 12", "hybrid", 0)]
     for finn_id, title, brand, model, type_, manual in rows:
         conn.execute("""INSERT INTO listings (finn_id, title, url, brand, model, type, manual_class,
                         first_seen_at, last_seen_at) VALUES (?, ?, 'u', ?, ?, ?, ?, 'x', 'x')""",
@@ -353,7 +354,8 @@ def test_old_listings_are_reclassified_once(tmp_path):
     create_app(str(path), start_scraper=False)
     result = {r[0]: (r[1], r[2]) for r in conn.execute("SELECT finn_id, type, model FROM listings")}
     assert result == {"1": ("deler", "Stealth"), "2": ("fairway", "Stealth"),
-                      "3": ("annet", ""), "4": ("driver", "G425 Max"), "5": ("putter", "")}
+                      "3": ("annet", ""), "4": ("driver", "G425 Max"), "5": ("putter", ""),
+                      "6": ("tilbehor", "Pro V1 12")}
 
 
 def test_correcting_a_find_protects_it(client, filled, conn):
@@ -362,3 +364,16 @@ def test_correcting_a_find_protects_it(client, filled, conn):
                                                  "type": "putter"})
     assert conn.execute("SELECT manual_class FROM listings WHERE id = ?",
                         (listing_id,)).fetchone()[0] == 1
+
+
+def test_grey_finds_have_their_own_filter_and_hide_the_profit(client, conn):
+    # Baller med typen «hybrid» fra søket: blir tilbehør og grå, uten fortjenestetall
+    for i in range(4):
+        add_listing(conn, 810000 + i, "Titleist TSi2 hybrid", 1500, "Titleist", "TSi2", "hybrid")
+    add_listing(conn, 810010, "Titleist Pro V1 golfballer", 125, "Titleist", "Pro V1",
+                "tilbehor")
+    html = client.get("/funn?farge=gra").get_data(as_text=True)
+    assert "Titleist Pro V1 golfballer" in html
+    assert "TSi2" not in html
+    assert "Usikker <span class=\"count\">1</span>" in html
+    assert "Forventet salg" not in html

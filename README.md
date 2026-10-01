@@ -5,17 +5,18 @@ Et enkelt dashbord for kjøp og videresalg av brukt golfutstyr fra Finn.no. Appe
 Dette får du:
 
 - **Oversikt:** fortjeneste, omsetning, penger bundet i lager, budsjettvarsel og grafer.
-- **Nye funn:** nye annonser fra Finn-søkene dine. Hver annonse er merket grønn (kjøp), gul (kanskje) eller rød (la være).
+- **Nye funn:** nye annonser fra Finn-søkene dine. Hver annonse er merket grønn (kjøp), gul (kanskje), rød (la være) eller grå (usikker).
 - **Lager:** alt du vurderer, har kjøpt og har solgt.
 - **Prissjekk:** sjekk om en annonse lønner seg.
 - **Markedspriser:** hva ting pleier å koste på Finn.
 
 På **Nye funn**, **Lager** og **Markedspriser** kan du bla etter **type** (putter, driver, jernsett …) og **merke**. Hver knapp viser hvor mange det er, og valgene kan kombineres, for eksempel «Putter» + «Scotty Cameron». Med **Sorter** kan du ordne listene etter for eksempel pris, fortjeneste eller alder.
 
-Typene er driver, fairwaykølle, hybrid, putter, jernsett, wedge, bag, **deler** og annet:
+Typene er driver, fairwaykølle, hybrid, putter, jernsett, wedge, bag, **deler**, **tilbehør** og annet:
 
 - **Deler** er løse hoder («driverhode»), skaft, headcovers og grep. En driver «med skaft» eller «inkl. headcover» er fortsatt en driver.
 - **Fairwaykølle** og **hybrid** har egne typer, så en 3-wood ikke blir sammenlignet med drivere.
+- **Tilbehør** er baller, traller, avstandsmålere, sko, hansker, klær og treningsutstyr. Tittelen avgjør: «Titleist Pro V1» blir tilbehør selv om den dukket opp i et hybrid-søk.
 - Annonser med flere køller (for eksempel «driver og 3-wood» eller et helt sett) havner under **Annet**.
 
 ### Solgte annonser
@@ -34,7 +35,7 @@ Golflager oppdager når annonser er solgt, uten å åpne enkeltannonser:
 
 ### Rydding
 
-- **Skjul alle** i Nye funn skjuler alle annonsene som vises. Filtrer for eksempel på «La være» først.
+- **Skjul alle** i Nye funn skjuler alle annonsene som vises. Velg for eksempel «Eldre enn 14 dager» eller «La være» først, så skjuler du bare dem.
 - Under **Skjulte** kan du slette annonser én og én, eller alle som vises.
 - Golflager rydder også selv: nye funn eldre enn 30 dager skjules, og skjulte annonser eldre enn 60 dager slettes. Du kan endre dette, eller slå det av, under **Innstillinger → Rydding i Nye funn**.
 - Slettede annonser vises ikke lenger, men prisene brukes fortsatt i markedsprisene. De dukker heller ikke opp igjen som nye når scraperen ser dem på Finn.
@@ -104,11 +105,16 @@ Fargene betyr:
 - 🟢 **Kjøp:** oppfyller regelen, og det finnes nok å sammenligne med.
 - 🟡 **Kanskje:** oppfyller regelen, men med lite data. Eller: gir litt fortjeneste, men under kravet ditt.
 - 🔴 **La være:** tap eller for lav fortjeneste.
+- ⚪ **Usikker:** Golflager vet for lite til å si noe. Da vises ingen fortjeneste på kortet, og du må sjekke prisen selv.
 
 Prissjekken er forsiktig når den ikke har sikre tall:
 
 - Bare **samme modell** kan gi grønt. Er sammenligningen med lignende modeller (for eksempel «Stealth» mot «Stealth 2 Plus»), blir det høyst gult.
 - **Deler** sammenlignes bare med andre deler og blir aldri grønne, fordi prisene på hoder og skaft varierer for mye.
+- Finnes ikke samme eller lignende modell, bare andre køller av samme merke og type, blir det **grått**. Det er for grovt til å anbefale noe.
+- **Tilbehør** og **Annet** (baller, traller, sett) blir alltid grå. Innholdet varierer for mye.
+- Sier ikke tittelen hva slags kølle det er (for eksempel bare «Ping G430 Max»), er typen gjettet ut fra søket. Da blir det høyst gult.
+- **Junior-, dame- og venstrehendte** køller sammenlignes bare med like køller, siden de selges for mindre.
 
 Prissjekken viser også **den høyeste prisen du kan betale** og fortsatt oppfylle regelen. Den er nyttig når du forhandler.
 

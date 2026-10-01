@@ -70,6 +70,7 @@
         {{ number_field('auto_hide_days', 'Skjul nye funn etter', 'dager', 'Nye funn som er eldre enn dette, flyttes til Skjulte. 0 = aldri.') }}
         {{ number_field('auto_delete_days', 'Slett skjulte annonser etter', 'dager', 'Slettede annonser vises ikke lenger, men prisene brukes fortsatt i markedsprisene. 0 = aldri.') }}
       </div>
+      <p class="hint">Vil du rydde med en gang? Gå til <a href="{{ url_for('main.funn', alder=14) }}">Nye funn</a>, velg for eksempel «Eldre enn 14 dager» og trykk <strong>Skjul alle</strong>. Under fanen <strong>Skjulte</strong> kan du så trykke <strong>Slett alle</strong>.</p>
     </section>
 
     <section class="form-section" id="scraper">
@@ -99,17 +100,19 @@
       <a class="btn" href="{{ url_for('main.sikkerhetskopi') }}">Last ned sikkerhetskopi</a>
       <p class="hint">Ta gjerne en kopi av og til, og legg den i iCloud eller på en minnepinne.</p>
     </div>
-    {% if settings.diagnostic_text %}
     <div class="card" id="feilsoking">
       <h2 style="margin-bottom:8px">Feilsøking</h2>
-      <p class="small">Hvordan den siste annonsen du merket som solgt, så ut i søket på Finn. Kopier teksten og send den til den som lager appen, så kan Golflager lære å oppdage solgte annonser selv.</p>
-      <textarea id="diagnostic" readonly style="margin-top:10px; min-height:140px; font: 12px/1.4 ui-monospace, Menlo, monospace">{{ settings.diagnostic_text }}</textarea>
-      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
-        <button class="btn btn--primary" type="button" data-copy="#diagnostic">Kopier teksten</button>
-        <button class="btn btn--ghost" type="submit" form="tom-form">Fjern</button>
-      </div>
+      {% if settings.diagnostic_text %}
+        <p class="small">Hvordan den siste annonsen du merket som solgt, så ut i søket på Finn. Kopier teksten og send den til den som lager appen, så kan Golflager lære å oppdage solgte annonser selv.</p>
+        <textarea id="diagnostic" readonly style="margin-top:10px; min-height:140px; font: 12px/1.4 ui-monospace, Menlo, monospace">{{ settings.diagnostic_text }}</textarea>
+        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap">
+          <button class="btn btn--primary" type="button" data-copy="#diagnostic">Kopier teksten</button>
+          <button class="btn btn--ghost" type="submit" form="tom-form">Fjern</button>
+        </div>
+      {% else %}
+        <p class="small">Er en annonse solgt på Finn, men står fortsatt under Nye funn? Trykk <strong>Solgt</strong> på annonsen. Da kommer det en tekst her som du kan kopiere og sende, så Golflager kan lære å oppdage solgte annonser selv.</p>
+      {% endif %}
     </div>
-    {% endif %}
     <div class="card" id="oppdatering">
       <h2 style="margin-bottom:8px">Oppdatering</h2>
       <p class="small">Du har versjon <strong>{{ app_version }}</strong>.</p>

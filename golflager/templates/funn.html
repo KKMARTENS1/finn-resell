@@ -21,13 +21,21 @@
   </nav>
   <nav class="seg" aria-label="Prissjekk">
     <a href="{{ url_with(farge=None) }}" {% if not color %}aria-current="true"{% endif %}>Alle</a>
-    {% for key in ['gronn', 'gul', 'rod'] %}
+    {% for key in ['gronn', 'gul', 'rod', 'gra'] %}
       <a href="{{ url_with(farge=key) }}" {% if color == key %}aria-current="true"{% endif %}>{{ VERDICTS[key] }} <span class="count">{{ counts[key] }}</span></a>
     {% endfor %}
   </nav>
+  <form method="get" class="inline">
+    {% for key in ['vis', 'farge', 'type', 'merke', 'sorter', 'sok'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
+    <label class="visually-hidden" for="alder">Alder</label>
+    <select id="alder" name="alder" data-autosubmit>
+      <option value="">Alle aldre</option>
+      {% for days, label in ages %}<option value="{{ days }}" {% if age == days %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </form>
   {% if searches|length > 1 %}
     <form method="get" class="inline">
-      {% for key in ['vis', 'farge', 'type', 'merke', 'sorter'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
+      {% for key in ['vis', 'farge', 'type', 'merke', 'sorter', 'alder'] %}{% if request.args.get(key) %}<input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">{% endif %}{% endfor %}
       <label class="visually-hidden" for="sok">Søk</label>
       <select id="sok" name="sok" data-autosubmit>
         <option value="">Alle søk</option>
@@ -76,6 +84,9 @@
     {% elif color %}
       <h3>Ingen annonser med denne fargen</h3>
       <p><a href="{{ url_with(farge=None) }}">Vis alle</a></p>
+    {% elif age %}
+      <h3>Ingen annonser som er så gamle</h3>
+      <p><a href="{{ url_with(alder=None) }}">Vis alle aldre</a></p>
     {% elif view == 'borte' %}
       <h3>Ingen solgte annonser ennå</h3>
       <p>Golflager ser etter solgte annonser {% if settings.sold_check_hours %}hver {{ settings.sold_check_hours }}. time{% else %}bare når det er slått på i Innstillinger{% endif %}. Annonser som er borte fra Finn, havner her.</p>
@@ -112,7 +123,7 @@
               {% if l.gone_reason == 'solgt' %}Finn viser annonsen som solgt{% elif l.gone_reason == 'manuell' %}Du merket annonsen som solgt{% else %}Annonsen er ikke lenger på Finn{% endif %}
               (oppdaget {{ l.gone_at|tid_siden }}).{% if days is not none %} Den lå ute i <strong>{{ days }} {{ 'dag' if days == 1 else 'dager' }}</strong>.{% endif %}
             </p>
-          {% elif r.expected_sale is not none and r.profit is not none %}
+          {% elif r.color != 'gra' and r.expected_sale is not none and r.profit is not none %}
             <dl class="calc">
               <div><dt>Forventet salg</dt><dd>{{ r.expected_sale|kr }}</dd></div>
               <div><dt>Fortjeneste</dt><dd class="{{ 'pos' if r.profit > 0 else 'neg' }}">{{ r.profit|kr(signed=True) }}</dd></div>

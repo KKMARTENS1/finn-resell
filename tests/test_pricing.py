@@ -84,7 +84,7 @@ def test_loss_is_red_and_max_price_is_given(conn):
 def test_no_data_and_no_price(conn):
     r = check(conn, brand="Ukjent", model="X", type_key="putter", price=1000)
     assert r.expected_sale is None
-    assert r.color == "gul"
+    assert r.color == "gra"
     assert r.label == "Ingen data"
     add_listing(conn, 5000, "Ping Anser", 3000, "Ping", "Anser", "putter")
     r = check(conn, brand="Ping", model="Anser", type_key="putter", price=None)
@@ -99,7 +99,9 @@ def test_similar_and_broad_matches(conn):
     assert "lignende" in r.basis
     r = check(conn, brand="Scotty Cameron", model="Futura", type_key="putter", price=1000)
     assert "samme merke og type" in r.basis
-    assert r.confidence == "lav"
+    # Et grovt anslag blir grått, aldri «Kanskje», selv om tallene ser bra ut
+    assert r.confidence == "grov" and r.color == "gra" and r.label == "Usikker"
+    assert "bare andre puttere fra Scotty Cameron" in r.reason
 
 
 def test_listing_is_not_compared_with_itself(conn):
@@ -154,7 +156,7 @@ def test_similar_model_is_never_green(conn):
     r = check(conn, brand="TaylorMade", model="Stealth", type_key="driver", price=2200)
     assert r.meets_rule and not r.suspicious
     assert r.confidence == "lav" and r.color == "gul"
-    assert "usikker" in r.reason
+    assert "ikke helt samme modell" in r.reason
 
 
 def test_parts_are_compared_with_parts_only_and_never_green(conn):
@@ -169,3 +171,59 @@ def test_parts_are_compared_with_parts_only_and_never_green(conn):
                     "Stealth", "deler")
     r = check(conn, brand="TaylorMade", model="Stealth", type_key="deler", price=600)
     assert r.expected_sale == 1350 and r.color == "gul"
+
+
+def test_balls_and_accessories_are_never_rated(conn):
+    r = check(conn, brand="Titleist", model="Pro V1", type_key="tilbehor", price=125)
+    assert r.color == "gra" and "vurderer ikke tilbehør" in r.reason
+    for i in range(5):
+        add_listing(conn, 9500 + i, "Titleist Pro V1 golfballer 24 stk", 600, "Titleist",
+                    "Pro V1", "tilbehor")
+    r = check(conn, brand="Titleist", model="Pro V1", type_key="tilbehor", price=125)
+    assert r.color == "gra" and r.label == "Usikker"
+    assert "vurderer ikke tilbehør" in r.reason
+    # Baller sammenlignes aldri med køller
+    for i in range(5):
+        add_listing(conn, 9600 + i, "Titleist TSi2 hybrid", 1500, "Titleist", "TSi2", "hybrid")
+    r = check(conn, brand="Titleist", model="Pro V1", type_key="tilbehor", price=125)
+    assert all(c.price == 600 for c in r.comparables)
+
+
+def test_guessed_type_is_never_green(conn):
+    for i in range(5):
+        add_listing(conn, 9700 + i, "Ping G430 Max driver", 4000, "Ping", "G430 Max", "driver")
+    sure = check(conn, brand="Ping", model="G430 Max", type_key="driver", price=2000,
+                 title="Ping G430 Max driver")
+    assert sure.color == "gronn"
+    guessed = check(conn, brand="Ping", model="G430 Max", type_key="driver", price=2000,
+                    title="Ping G430 Max", type_known=False)
+    assert guessed.color == "gul"
+    assert "gjettet ut fra søket" in guessed.reason
+
+
+def test_junior_ladies_and_left_handed_are_compared_with_their_own_kind(conn):
+    for i in range(5):
+        add_listing(conn, 9800 + i, "Callaway Rogue driver", 2500, "Callaway", "Rogue", "driver")
+    junior = check(conn, brand="Callaway", model="Rogue", type_key="driver", price=600,
+                   title="Callaway Rogue junior driver")
+    assert junior.expected_sale is None and junior.color == "gra"
+    assert "for juniorer" in junior.reason
+
+    for i in range(3):
+        add_listing(conn, 9900 + i, "Callaway Rogue driver venstre", 1500, "Callaway", "Rogue",
+                    "driver")
+    lefty = check(conn, brand="Callaway", model="Rogue", type_key="driver", price=600,
+                  title="Callaway Rogue driver LH")
+    assert {c.price for c in lefty.comparables} == {1500}
+    assert any("venstrehendte" in note for note in lefty.notes)
+    # Vanlige køller sammenlignes ikke med venstrehendte
+    normal = check(conn, brand="Callaway", model="Rogue", type_key="driver", price=600,
+                   title="Callaway Rogue driver")
+    assert {c.price for c in normal.comparables} == {2500}
+
+    # Heller ikke dine egne salg av voksenkøller brukes for en juniorkølle
+    add_item(conn, brand="Callaway", model="Rogue", type="driver", status="solgt",
+             sale_price=2400, sale_date="2026-09-01")
+    junior = check(conn, brand="Callaway", model="Rogue", type_key="driver", price=600,
+                   title="Callaway Rogue junior driver")
+    assert junior.expected_sale is None
