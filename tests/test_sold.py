@@ -132,6 +132,28 @@ def test_safety_stop_when_too_many_vanish(search):
     assert any("ser rart ut" in r[0] for r in search.execute("SELECT message FROM scrape_log"))
 
 
+def test_long_gone_ads_are_marked_even_when_the_safety_stop_is_on(search):
+    """Annonser som har vært borte lenge, skal ikke holdes igjen av sikkerhetssperren.
+
+    Før ble sperren stående på for alltid når mange gamle annonser var solgt.
+    """
+    now = datetime.now()
+    ids = list(range(412300500, 412300508))
+    run_checks(search, fetch=lambda url: page(ids), sleep=no_sleep, now=now)
+    week_ago = (now - timedelta(days=7)).isoformat(sep=" ", timespec="seconds")
+    search.execute("UPDATE listings SET first_seen_at = '2026-01-01 00:00:00'")
+    # Seks av annonsene ble sist sett for en uke siden (solgt for lenge siden)
+    search.execute("UPDATE listings SET last_seen_at = ? WHERE finn_id NOT IN (?, ?)",
+                   (week_ago, str(ids[0]), str(ids[1])))
+    search.commit()
+    summary = run_checks(search, fetch=lambda url: page(ids[:2]), sleep=no_sleep,
+                         now=now + timedelta(hours=7))
+    assert summary["gone"] == 6
+    result = statuses(search)
+    assert result[str(ids[0])] == "aktiv" and result[str(ids[1])] == "aktiv"
+    assert [result[str(i)] for i in ids[2:]] == ["borte"] * 6
+
+
 def test_sold_ads_have_their_own_tab(client, search):
     run_checks(search, fetch=lambda url: page([412300501, 412300502], sold={412300502}),
                sleep=no_sleep)
@@ -249,8 +271,15 @@ def test_diagnostics_when_ad_is_missing_from_search(client, search):
     search.commit()
     listing_id = search.execute("SELECT id FROM listings WHERE finn_id = '412300999'"
                                 ).fetchone()[0]
+    from golflager.db import log_event
+
+    name = search.execute("SELECT name FROM searches WHERE id = 1").fetchone()[0]
+    log_event(search, "advarsel", f"Søket «{name}» manglet 9 av 10 annonser på én gang.")
+    search.commit()
     client.post(f"/funn/{listing_id}/solgt")
-    assert "var ikke med i de siste søkesidene" in get_settings(search)["diagnostic_text"]
+    text = get_settings(search)["diagnostic_text"]
+    assert "var ikke med i de siste søkesidene" in text
+    assert "manglet 9 av 10 annonser" in text and "Treff i søket sist:" in text
 
 
 def test_check_sold_now_button(client, search, app):

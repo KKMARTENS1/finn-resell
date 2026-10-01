@@ -64,6 +64,13 @@ def describe_listing(conn: sqlite3.Connection, listing: sqlite3.Row, version: st
         lines.append(f"Søk: {search['name']} (aktiv: {'ja' if search['active'] else 'nei'})")
         lines.append(f"Lenke: {search['url']}")
         lines.append(f"Sjekket for solgte: {search['last_full_check_at'] or 'aldri'}")
+        lines.append(f"Treff i søket sist: {search['last_count']}")
+        logs = conn.execute(
+            "SELECT at, message FROM scrape_log WHERE message LIKE ? ORDER BY id DESC LIMIT 5",
+            (f"%«{search['name']}»%",),
+        ).fetchall()
+        for log in logs:
+            lines.append(f"Logg {log['at']}: {log['message']}")
 
     folder = last_pages_dir(conn)
     pages: List[Path] = []

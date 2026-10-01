@@ -239,6 +239,9 @@ def _save_debug_copy(conn: sqlite3.Connection, html: str, label: str) -> str:
 FULL_CHECK_PAGES = 5
 LAST_PAGE_SIZE = 10  # en side med færre treff enn dette er siste side
 MAX_GONE_SHARE = 0.5  # sikkerhetssperre: aldri merk mer enn halvparten borte på én gang
+# En annonse som ikke har vært med i søket på så lenge, er borte (solgt eller fjernet).
+# Sperren over gjelder ikke for dem, ellers kan den bli stående på for alltid.
+STALE_HOURS = 48
 
 
 def _full_check_due(search: sqlite3.Row, hours: int, now: datetime) -> bool:
@@ -254,24 +257,33 @@ def mark_gone(conn: sqlite3.Connection, search: sqlite3.Row, seen_ids: Set[str],
 
     Kalles bare når hele søket er gjennomgått. Bare annonser som ble funnet før denne
     gjennomgangen startet, og som ikke allerede er kjøpt eller slettet, kan merkes.
+
+    Forsvinner over halvparten av annonsene som var med nylig på én gang, er det trolig noe
+    rart med svaret fra Finn, og de blir ikke merket. Annonser som ikke har vært med i søket
+    på over STALE_HOURS timer, merkes likevel.
     """
     rows = conn.execute(
-        """SELECT id, finn_id FROM listings
+        """SELECT id, finn_id, last_seen_at FROM listings
            WHERE search_id = ? AND gone_at IS NULL AND status IN ('ny', 'skjult')
              AND first_seen_at < ?""",
         (search["id"], started),
     ).fetchall()
-    missing = [row["id"] for row in rows if row["finn_id"] not in seen_ids]
-    if len(missing) > 3 and len(missing) > len(rows) * MAX_GONE_SHARE:
+    stale_before = ((_parse(started) or datetime.now()) - timedelta(hours=STALE_HOURS)).isoformat(
+        sep=" ", timespec="seconds")
+    recent = [row for row in rows if (row["last_seen_at"] or "") >= stale_before]
+    missing = [row for row in rows if row["finn_id"] not in seen_ids]
+    stale = [row for row in missing if (row["last_seen_at"] or "") < stale_before]
+    fresh = [row for row in missing if (row["last_seen_at"] or "") >= stale_before]
+    if len(fresh) > 3 and len(fresh) > len(recent) * MAX_GONE_SHARE:
         log_event(conn, "advarsel",
-                  f"Søket «{search['name']}» manglet {len(missing)} av {len(rows)} annonser på én "
-                  "gang. Det ser rart ut, så ingen annonser ble merket som solgt.")
-        return 0
+                  f"Søket «{search['name']}» manglet {len(fresh)} av {len(recent)} annonser på én "
+                  "gang. Det ser rart ut, så de ble ikke merket som solgt nå.")
+        fresh = []
     now = now_str()
-    for listing_id in missing:
+    for row in stale + fresh:
         conn.execute("UPDATE listings SET gone_at = ?, gone_reason = 'borte' WHERE id = ?",
-                     (now, listing_id))
-    return len(missing)
+                     (now, row["id"]))
+    return len(stale) + len(fresh)
 
 
 def run_checks(
