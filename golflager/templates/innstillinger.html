@@ -124,6 +124,16 @@
         <button class="btn" type="submit" form="sjekk-form" style="margin-top:12px">{{ icon('refresh', 16) }}Se etter oppdatering</button>
       {% endif %}
     </div>
+    <div class="card" id="start-pa-nytt">
+      <h2 style="margin-bottom:8px">Start på nytt</h2>
+      <p class="small">Sletter <strong>alle annonsene</strong> fra Finn: nye funn, skjulte, solgte og markedsprisene. <strong>Lageret</strong>, salgene dine og innstillingene beholdes, og det tas en sikkerhetskopi først.</p>
+      <div class="stack" style="gap:8px; margin-top:12px">
+        <label class="small" style="font-weight:400; display:flex; gap:8px; align-items:flex-start"><input type="radio" name="visning" value="nye" form="nytt-form" checked> <span><strong>Bare nye annonser fra nå av</strong> (anbefalt). Annonser som allerede ligger ute, brukes bare i markedsprisene.</span></label>
+        <label class="small" style="font-weight:400; display:flex; gap:8px; align-items:flex-start"><input type="radio" name="visning" value="alle" form="nytt-form"> <span>Hent alle annonsene som ligger ute nå, inn på nytt.</span></label>
+        <label class="small" style="font-weight:400; display:flex; gap:8px; align-items:flex-start; margin-top:4px"><input type="checkbox" name="behold_sok" value="1" form="nytt-form" checked> <span>Behold Finn-søkene mine</span></label>
+      </div>
+      <button class="btn btn--danger" type="submit" form="nytt-form" style="margin-top:12px">Slett alle annonser</button>
+    </div>
     <div class="card">
       <h2 style="margin-bottom:8px">Slå av Golflager</h2>
       <p class="small">Golflager kjører i bakgrunnen og sjekker Finn til du slår av Macen eller trykker her. Du starter den igjen med Golflager-ikonet i Dock.</p>
@@ -134,6 +144,8 @@
 <form id="oppdater-form" method="post" action="{{ url_for('main.oppdater') }}" data-busy="Oppdaterer …"></form>
 <form id="sjekk-form" method="post" action="{{ url_for('main.oppdater_sjekk') }}" data-busy="Sjekker …"></form>
 <form id="tom-form" method="post" action="{{ url_for('main.feilsoking_tom') }}"></form>
+<form id="nytt-form" method="post" action="{{ url_for('main.start_pa_nytt') }}"
+      data-confirm="Slette alle annonsene? Lageret, salgene og innstillingene dine beholdes."></form>
 <form id="avslutt-form" method="post" action="{{ url_for('main.avslutt') }}"
       data-confirm="Slå av Golflager? Scraperen slutter å sjekke Finn til du starter Golflager igjen."></form>
 {% endblock %}

@@ -1101,6 +1101,30 @@ def scraper_solgte():
     return redirect(url_for("main.sok"))
 
 
+@bp.route("/innstillinger/start-pa-nytt", methods=["POST"])
+def start_pa_nytt():
+    """Sletter alle annonser, men beholder lageret, salgene og innstillingene."""
+    from .cleanup import start_over
+
+    if worker().running:
+        flash("Scraperen sjekker Finn akkurat nå. Vent til den er ferdig, og prøv igjen.", "feil")
+        return redirect(url_for("main.innstillinger") + "#start-pa-nytt")
+    conn = get_db()
+    keep_searches = request.form.get("behold_sok") == "1"
+    only_new = request.form.get("visning", "nye") == "nye"
+    start_over(conn, keep_searches=keep_searches, only_new=only_new)
+    if not keep_searches:
+        message = "Alle annonser og Finn-søk er slettet. Legg inn nye søk når du er klar."
+    elif only_new:
+        message = ("Alle annonser er slettet. Fra nå av dukker bare annonser som legges ut på "
+                   "Finn etter i dag, opp under Nye funn.")
+    else:
+        message = ("Alle annonser er slettet. Ved neste sjekk hentes annonsene som ligger ute "
+                   "på Finn nå, inn på nytt.")
+    flash(message + " Lageret ditt er som før.", "ok")
+    return redirect(url_for("main.funn"))
+
+
 @bp.route("/feilsoking/tom", methods=["POST"])
 def feilsoking_tom():
     conn = get_db()

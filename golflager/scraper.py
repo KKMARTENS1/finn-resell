@@ -143,10 +143,16 @@ def store_ads(conn: sqlite3.Connection, search: sqlite3.Row, ads: Iterable[Parse
     """Lagrer annonsene. Returnerer (antall nye, antall vi har sett før)."""
     now = now or now_str()
     new = known = 0
+    # Etter «Start på nytt» med «bare nye annonser» lagres annonser som lå ute fra før, som
+    # skjulte. Prisene brukes da i markedsprisene, men de fyller ikke opp Nye funn.
+    hide_before = search["hide_before"] if "hide_before" in search.keys() else None
+    first_run = search["last_checked_at"] is None if "last_checked_at" in search.keys() else False
     for ad in ads:
         if is_wanted_ad(ad.title) or "ønskes" in ad.trade_type.lower():
             continue
         published = ad.published_at.isoformat(sep=" ") if ad.published_at else None
+        old_ad = bool(hide_before) and (
+            published[:19] < hide_before if published else first_run)
         row = conn.execute(
             "SELECT id, price, gone_at FROM listings WHERE finn_id = ?", (ad.finn_id,)
         ).fetchone()
@@ -158,9 +164,10 @@ def store_ads(conn: sqlite3.Connection, search: sqlite3.Row, ads: Iterable[Parse
                 """INSERT INTO listings (finn_id, search_id, title, price, location, published_at,
                        url, image_url, brand, model, type, condition, status, first_seen_at,
                        last_seen_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ny', ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (ad.finn_id, search["id"], ad.title, ad.price, ad.location, published, ad.url,
-                 ad.image_url, brand, model, type_key, detect_condition(ad.title), now, now),
+                 ad.image_url, brand, model, type_key, detect_condition(ad.title),
+                 "skjult" if old_ad else "ny", now, now),
             )
             if ad.price is not None:
                 conn.execute(
@@ -172,7 +179,7 @@ def store_ads(conn: sqlite3.Connection, search: sqlite3.Row, ads: Iterable[Parse
                     "UPDATE listings SET gone_at = ?, gone_reason = 'solgt' WHERE id = ?",
                     (now, cursor.lastrowid),
                 )
-            else:
+            elif not old_ad:
                 new += 1
             continue
         known += 1
@@ -370,9 +377,10 @@ def run_checks(
         note = "" if found else (
             "Ingen treff. Hvis du vet at søket har treff på Finn, kan Finn ha endret nettsiden."
         )
+        # hide_before gjelder bare første gjennomgang etter «Start på nytt»
         conn.execute(
-            "UPDATE searches SET last_checked_at = ?, last_count = ?, last_new = ?, last_note = ? "
-            "WHERE id = ?",
+            "UPDATE searches SET last_checked_at = ?, last_count = ?, last_new = ?, last_note = ?, "
+            "hide_before = NULL WHERE id = ?",
             (now_str(), found, new_here, note, search["id"]),
         )
         conn.commit()

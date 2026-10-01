@@ -44,6 +44,7 @@ Skriv i søkefeltet på **Nye funn**, for eksempel «stealth 3». Tallene på fa
 - Under **Skjulte** kan du slette annonser én og én, eller alle som vises.
 - Golflager rydder også selv: nye funn eldre enn 30 dager skjules, og skjulte annonser eldre enn 60 dager slettes. Du kan endre dette, eller slå det av, under **Innstillinger → Rydding i Nye funn**.
 - Slettede annonser vises ikke lenger, men prisene brukes fortsatt i markedsprisene. De dukker heller ikke opp igjen som nye når scraperen ser dem på Finn.
+- **Start på nytt** (under Innstillinger) sletter alle annonsene, også markedsprisene. Lageret, salgene og innstillingene beholdes, og en sikkerhetskopi lagres i `~/Golflager/sikkerhetskopier`. Velger du «Bare nye annonser fra nå av», brukes annonsene som allerede ligger ute, bare i markedsprisene, og bare nye annonser dukker opp under Nye funn.
 - **Finn-søk:** her legger du inn søkene scraperen skal følge med på.
 
 ---

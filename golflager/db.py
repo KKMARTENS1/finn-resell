@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS searches (
     last_count      INTEGER,
     last_new        INTEGER,
     last_note       TEXT NOT NULL DEFAULT '',
-    last_full_check_at TEXT
+    last_full_check_at TEXT,
+    hide_before     TEXT
 );
 
 CREATE TABLE IF NOT EXISTS inventory (
@@ -209,6 +210,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     search_columns = {row["name"] for row in conn.execute("PRAGMA table_info(searches)")}
     if "last_full_check_at" not in search_columns:
         conn.execute("ALTER TABLE searches ADD COLUMN last_full_check_at TEXT")
+    if "hide_before" not in search_columns:
+        # Etter «Start på nytt»: annonser lagt ut før dette vises ikke som nye funn
+        conn.execute("ALTER TABLE searches ADD COLUMN hide_before TEXT")
 
 
 CLASSIFY_VERSION = 3
