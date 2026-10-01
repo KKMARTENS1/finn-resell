@@ -12,6 +12,17 @@ Dette får du:
 
 På **Nye funn**, **Lager** og **Markedspriser** kan du bla etter **type** (putter, driver, jernsett …) og **merke**. Hver knapp viser hvor mange det er, og valgene kan kombineres, for eksempel «Putter» + «Scotty Cameron». Med **Sorter** kan du ordne listene etter for eksempel pris, fortjeneste eller alder.
 
+### Solgte annonser
+
+Golflager oppdager når annonser er solgt, uten å åpne enkeltannonser:
+
+- Viser Finn «Solgt» på en annonse i søkeresultatene, merkes den med én gang.
+- Hver 6. time blar scraperen gjennom alle sidene i hvert søk (maks 5 sider). Annonser som ikke lenger er med, merkes «Trolig solgt». Det kan også bety at selgeren har tatt den bort eller satt opp prisen over maksprisen i søket.
+- Solgte annonser flyttes fra Nye funn til fanen **Solgt / borte**, der du ser hvor lenge de lå ute.
+- Søk med mer enn 5 sider kan ikke sjekkes. Gjør dem smalere, for eksempel med makspris.
+- Ser det ut som over halvparten av annonsene i et søk forsvant på én gang, merkes ingenting. Da er det trolig noe rart med svaret fra Finn.
+- Du kan endre hvor ofte, eller slå det av, under **Innstillinger → Scraper**.
+
 ### Rydding
 
 - **Skjul alle** i Nye funn skjuler alle annonsene som vises. Filtrer for eksempel på «La være» først.

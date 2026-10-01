@@ -110,7 +110,7 @@ def test_run_checks_stores_new_ads_and_skips_wanted(conn):
     add_search(conn, default_brand="Scotty Cameron", default_type="putter")
     fetched = []
     summary = run_checks(conn, fetch=lambda url: fetched.append(url) or TURBO, sleep=no_sleep)
-    assert summary == {"checked": 1, "new": 3}
+    assert summary == {"checked": 1, "new": 3, "gone": 0}
     assert len(fetched) == 1  # bare søkesiden, ingen enkeltannonser
     rows = {r["finn_id"]: r for r in conn.execute("SELECT * FROM listings")}
     assert "412345673" not in rows  # «Ønskes kjøpt»
@@ -173,7 +173,7 @@ def test_empty_search_is_fine(conn):
     add_search(conn)
     summary = run_checks(conn, fetch=lambda url: "<html><body>Ingen treff</body></html>",
                          sleep=no_sleep)
-    assert summary == {"checked": 1, "new": 0}
+    assert summary == {"checked": 1, "new": 0, "gone": 0}
     note = conn.execute("SELECT last_note FROM searches").fetchone()[0]
     assert "Ingen treff" in note
 

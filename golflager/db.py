@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS searches (
     last_checked_at TEXT,
     last_count      INTEGER,
     last_new        INTEGER,
-    last_note       TEXT NOT NULL DEFAULT ''
+    last_note       TEXT NOT NULL DEFAULT '',
+    last_full_check_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS inventory (
@@ -67,7 +68,9 @@ CREATE TABLE IF NOT EXISTS listings (
     status        TEXT NOT NULL DEFAULT 'ny',
     first_seen_at TEXT NOT NULL,
     last_seen_at  TEXT NOT NULL,
-    inventory_id  INTEGER REFERENCES inventory(id) ON DELETE SET NULL
+    inventory_id  INTEGER REFERENCES inventory(id) ON DELETE SET NULL,
+    gone_at       TEXT,
+    gone_reason   TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status, first_seen_at);
 
@@ -110,6 +113,7 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "page_delay_s": 5,
     "pages_per_search": 1,
     "scraper_enabled": 1,
+    "sold_check_hours": 6,  # se etter solgte annonser (0 = av)
     "scraper_error": "",
     "scraper_notice": "",
     "scraper_last_run": "",
@@ -140,6 +144,7 @@ LIMITS = {
     "market_months": (1, 120),
     "budget_kr": (0, 10_000_000),
     "auto_hide_days": (0, 3650),
+    "sold_check_hours": (0, 168),
     "auto_delete_days": (0, 3650),
 }
 
@@ -192,6 +197,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
             if condition is not None:
                 conn.execute("UPDATE listings SET condition = ? WHERE id = ?",
                              (condition, row["id"]))
+    for column in ("gone_at", "gone_reason"):
+        if column not in columns:
+            conn.execute(f"ALTER TABLE listings ADD COLUMN {column} TEXT")
+    search_columns = {row["name"] for row in conn.execute("PRAGMA table_info(searches)")}
+    if "last_full_check_at" not in search_columns:
+        conn.execute("ALTER TABLE searches ADD COLUMN last_full_check_at TEXT")
 
 
 def _convert(raw: Optional[str], default: Any) -> Any:

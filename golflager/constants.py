@@ -34,7 +34,7 @@ CONDITIONS = [
 ]
 CONDITION_LABELS = dict(CONDITIONS)
 
-LISTING_STATUSES = {"ny": "Nye", "skjult": "Skjulte", "kjopt": "Kjøpt"}
+LISTING_STATUSES = {"ny": "Nye", "skjult": "Skjulte", "borte": "Solgt / borte", "kjopt": "Kjøpt"}
 
 VERDICTS = {
     "gronn": "Kjøp",

@@ -60,6 +60,7 @@
     <li>{{ icon('check', 14) }}Henter bare søkeresultatsidene, ikke hver annonse</li>
     <li>{{ icon('check', 14) }}Venter {{ settings.page_delay_s }}–{{ settings.page_delay_s + 4 }} sekunder mellom hver side</li>
     <li>{{ icon('check', 14) }}Stopper og sier fra hvis Finn blokkerer eller svarer med feil</li>
+    {% if settings.sold_check_hours %}<li>{{ icon('check', 14) }}Ser etter solgte annonser hver {{ settings.sold_check_hours }}. time (maks 5 sider per søk)</li>{% endif %}
   </ul>
   <p class="hint" style="margin-top:12px">Scraperen går bare mens Golflager er åpen på Macen.</p>
 </section>
@@ -78,6 +79,7 @@
                 <span>Sjekket {{ s.last_checked_at|tid_siden if s.last_checked_at else 'ikke ennå' }}</span>
                 {% if s.last_count is not none %}<span>{{ s.last_count }} treff sist · {{ s.last_new or 0 }} nye</span>{% endif %}
                 <span>{{ s.total }} annonser totalt</span>
+                {% if s.last_full_check_at %}<span>Sjekket for solgte {{ s.last_full_check_at|tid_siden }}</span>{% endif %}
                 {% if s.default_brand or s.default_type %}
                   <span>Standard: {{ s.default_brand or '–' }}{% if s.default_type %} · {{ TYPE_LABELS[s.default_type] }}{% endif %}</span>
                 {% endif %}

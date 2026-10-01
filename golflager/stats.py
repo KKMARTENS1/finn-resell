@@ -164,9 +164,11 @@ def dashboard(conn: sqlite3.Connection, settings: Dict[str, Any]) -> Dict[str, A
 
     last_seen = settings["last_seen_finds_at"] or "0000"
     new_finds = conn.execute(
-        "SELECT COUNT(*) FROM listings WHERE status = 'ny' AND first_seen_at > ?", (last_seen,)
+        "SELECT COUNT(*) FROM listings WHERE status = 'ny' AND gone_at IS NULL AND first_seen_at > ?", (last_seen,)
     ).fetchone()[0]
-    open_finds = conn.execute("SELECT COUNT(*) FROM listings WHERE status = 'ny'").fetchone()[0]
+    open_finds = conn.execute(
+        "SELECT COUNT(*) FROM listings WHERE status = 'ny' AND gone_at IS NULL"
+    ).fetchone()[0]
 
     return {
         "invested": invested,

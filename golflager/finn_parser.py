@@ -47,6 +47,7 @@ class ParsedAd:
     published_at: Optional[datetime] = None
     image_url: str = ""
     trade_type: str = ""
+    sold: bool = False  # Finn viser «Solgt» på annonsen
 
 
 @dataclass
@@ -54,6 +55,7 @@ class ParseResult:
     ads: List[ParsedAd] = field(default_factory=list)
     link_ids: Set[str] = field(default_factory=set)
     source: str = "none"
+    total: Optional[int] = None  # antall treff i hele søket, hvis Finn oppgir det
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +340,30 @@ def _location_from(d: Dict[str, Any]) -> str:
     return _first_str(d.get("local_area_name"), d.get("area"), d.get("municipality"))
 
 
+SOLD_WORDS = {"sold", "solgt", "is_sold", "sold_out"}
+
+
+def _is_sold(d: Dict[str, Any]) -> bool:
+    """Ser etter «Solgt»-merker i dataene Finn sender med søkeresultatene."""
+    if d.get("sold") is True or d.get("is_sold") is True:
+        return True
+    status = d.get("status") or d.get("ad_status")
+    if isinstance(status, str) and status.strip().lower() in SOLD_WORDS:
+        return True
+    flags = d.get("flags")
+    if isinstance(flags, list) and any(isinstance(f, str) and f.lower() in SOLD_WORDS
+                                       for f in flags):
+        return True
+    labels = d.get("labels")
+    if isinstance(labels, list):
+        for label in labels:
+            values = [label] if isinstance(label, str) else (
+                [label.get("id"), label.get("text")] if isinstance(label, dict) else [])
+            if any(isinstance(v, str) and v.strip().lower() in SOLD_WORDS for v in values):
+                return True
+    return False
+
+
 def ad_from_dict(d: Dict[str, Any], base_url: str = "https://www.finn.no/") -> Optional[ParsedAd]:
     title = _first_str(d.get("heading"), d.get("title"), d.get("name"))
     if not title:
@@ -380,7 +406,18 @@ def ad_from_dict(d: Dict[str, Any], base_url: str = "https://www.finn.no/") -> O
         published_at=published,
         image_url=urljoin(base_url, image) if image else "",
         trade_type=_first_str(d.get("trade_type"), d.get("tradeType")),
+        sold=_is_sold(d),
     )
+
+
+def total_from_embedded(objects: List[Any]) -> Optional[int]:
+    """Antall treff i hele søket («match_count»), hvis Finn sender det med."""
+    for obj in objects:
+        for d in _walk(obj):
+            value = d.get("match_count")
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                return value
+    return None
 
 
 def ads_from_embedded(objects: List[Any], base_url: str) -> List[ParsedAd]:
@@ -498,6 +535,7 @@ def ads_from_html(soup: BeautifulSoup, base_url: str) -> List[ParsedAd]:
             published_at=published,
             image_url=urljoin(base_url, image_url) if image_url else "",
             trade_type="Ønskes kjøpt" if any(t.lower() == "ønskes kjøpt" for t in texts) else "",
+            sold=any(t.strip().lower() == "solgt" for t in texts),
         )
         order.append(finn_id)
     return [ads[i] for i in order if i in ads]
@@ -522,6 +560,7 @@ def _merge(primary: List[ParsedAd], secondary: List[ParsedAd]) -> List[ParsedAd]
             continue
         ad.location = ad.location or other.location
         ad.image_url = ad.image_url or other.image_url
+        ad.sold = ad.sold or other.sold
         ad.published_at = ad.published_at or other.published_at
         if ad.price is None:
             ad.price = other.price
@@ -531,7 +570,8 @@ def _merge(primary: List[ParsedAd], secondary: List[ParsedAd]) -> List[ParsedAd]
 def parse_search_page(html: str, base_url: str = "https://www.finn.no/") -> ParseResult:
     soup = BeautifulSoup(html, "html.parser")
     link_ids = {m for a in soup.find_all("a", href=True) for m in ITEM_ID_RE.findall(a["href"])}
-    embedded = ads_from_embedded(extract_embedded_data(soup), base_url)
+    objects = extract_embedded_data(soup)
+    embedded = ads_from_embedded(objects, base_url)
     from_html = ads_from_html(soup, base_url)
     if embedded:
         ads, source = _merge(embedded, from_html), "data"
@@ -539,7 +579,8 @@ def parse_search_page(html: str, base_url: str = "https://www.finn.no/") -> Pars
         ads, source = from_html, "html"
     else:
         ads, source = [], "none"
-    return ParseResult(ads=ads, link_ids=link_ids, source=source)
+    return ParseResult(ads=ads, link_ids=link_ids, source=source,
+                       total=total_from_embedded(objects))
 
 
 def looks_blocked(html: str) -> bool:

@@ -15,7 +15,7 @@
 
 <div class="filters">
   <nav class="seg" aria-label="Vis">
-    {% for key, label in [('ny', 'Nye'), ('skjult', 'Skjulte'), ('kjopt', 'Kjøpt')] %}
+    {% for key, label in LISTING_TABS %}
       <a href="{{ url_with(vis=key) }}" {% if view == key %}aria-current="true"{% endif %}>{{ label }} <span class="count">{{ tab_counts[key] }}</span></a>
     {% endfor %}
   </nav>
@@ -49,7 +49,7 @@
           <input type="hidden" name="handling" value="skjul">
           <button class="btn btn--small" type="submit">Skjul alle {{ total }}</button>
         </form>
-      {% elif view == 'skjult' and total %}
+      {% elif view in ('skjult', 'borte') and total %}
         <form method="post" action="{{ url_for('main.funn_rydd', **request.args.to_dict()) }}"
               data-confirm="Slette alle {{ total }} annonsene som vises nå? De kan ikke hentes tilbake. Prisene brukes fortsatt i markedsprisene.">
           <input type="hidden" name="handling" value="slett">
@@ -76,6 +76,9 @@
     {% elif color %}
       <h3>Ingen annonser med denne fargen</h3>
       <p><a href="{{ url_with(farge=None) }}">Vis alle</a></p>
+    {% elif view == 'borte' %}
+      <h3>Ingen solgte annonser ennå</h3>
+      <p>Golflager ser etter solgte annonser {% if settings.sold_check_hours %}hver {{ settings.sold_check_hours }}. time{% else %}bare når det er slått på i Innstillinger{% endif %}. Annonser som er borte fra Finn, havner her.</p>
     {% else %}
       <h3>Her er det tomt</h3>
     {% endif %}
@@ -84,12 +87,17 @@
   <div class="finds">
     {% for c in cards %}
       {% set l = c.listing %}{% set r = c.check %}
-      <article class="find find--{{ r.color }}" id="funn-{{ l.id }}">
+      {% set sold = view == 'borte' %}
+      <article class="find find--{{ 'solgt' if sold else r.color }}" id="funn-{{ l.id }}">
         <a class="find__img" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" tabindex="-1" aria-hidden="true">
           {% if l.image_url %}<img src="{{ l.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
           {% else %}<span class="placeholder">Ingen bilde</span>{% endif %}
         </a>
-        <div class="find__verdict">{{ flag(r.color, r.label) }}</div>
+        {% if sold %}
+          <div class="find__verdict">{{ flag('solgt', 'Solgt' if l.gone_reason == 'solgt' else 'Trolig solgt') }}</div>
+        {% else %}
+          <div class="find__verdict">{{ flag(r.color, r.label) }}</div>
+        {% endif %}
         {% if view == 'ny' and l.first_seen_at > previous_seen %}<span class="find__new">Ny</span>{% endif %}
         <div class="find__body">
           <div class="find__meta">
@@ -98,17 +106,25 @@
           </div>
           <h3 class="find__title"><a href="{{ l.url }}" target="_blank" rel="noopener noreferrer">{{ l.title }}</a></h3>
           <div class="find__price">{{ l.price|kr if l.price is not none else 'Uten pris' }}</div>
-          {% if r.expected_sale is not none and r.profit is not none %}
+          {% if sold %}
+            {% set days = days_between(l.published_at or l.first_seen_at, l.gone_at) %}
+            <p class="find__reason">
+              {% if l.gone_reason == 'solgt' %}Finn viser annonsen som solgt{% else %}Annonsen er ikke lenger på Finn{% endif %}
+              (oppdaget {{ l.gone_at|tid_siden }}).{% if days is not none %} Den lå ute i <strong>{{ days }} {{ 'dag' if days == 1 else 'dager' }}</strong>.{% endif %}
+            </p>
+          {% elif r.expected_sale is not none and r.profit is not none %}
             <dl class="calc">
               <div><dt>Forventet salg</dt><dd>{{ r.expected_sale|kr }}</dd></div>
               <div><dt>Fortjeneste</dt><dd class="{{ 'pos' if r.profit > 0 else 'neg' }}">{{ r.profit|kr(signed=True) }}</dd></div>
               <div><dt>Maks pris</dt><dd>{{ r.max_price|kr if r.max_price else '–' }}</dd></div>
             </dl>
           {% endif %}
+          {% if not sold %}
           <p class="find__reason">{{ r.reason }}{% if r.basis %} <span class="muted">{{ r.basis.split('.')[0] }}.</span>{% endif %}</p>
+          {% endif %}
           {% if l.condition %}
             <p class="find__cond">Tilstand: <strong>{{ CONDITION_LABELS[l.condition] }}</strong></p>
-          {% elif view != 'kjopt' %}
+          {% elif view not in ('kjopt', 'borte') %}
             <p class="find__cond find__cond--unknown">{{ icon("alert", 14) }}Tilstand ukjent – se bildene før du kjøper.</p>
           {% endif %}
           <details class="find__fix">
@@ -141,7 +157,12 @@
             </form>
           </details>
           <div class="find__actions">
-            {% if view == 'kjopt' %}
+            {% if sold %}
+              <form class="inline" method="post" action="{{ url_for('main.funn_slett', listing_id=l.id) }}">
+                <input type="hidden" name="next" value="{{ here }}">
+                <button class="btn btn--danger" type="submit" title="Fjern annonsen for godt">Slett</button>
+              </form>
+            {% elif view == 'kjopt' %}
               {% if l.inventory_id %}<a class="btn btn--primary" href="{{ url_for('main.lager_endre', item_id=l.inventory_id) }}">Åpne i lageret</a>{% endif %}
             {% else %}
               <form class="inline" method="post" action="{{ url_for('main.funn_kjopt', listing_id=l.id) }}" style="flex:1; display:flex">

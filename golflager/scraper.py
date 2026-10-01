@@ -148,7 +148,7 @@ def store_ads(conn: sqlite3.Connection, search: sqlite3.Row, ads: Iterable[Parse
             continue
         published = ad.published_at.isoformat(sep=" ") if ad.published_at else None
         row = conn.execute(
-            "SELECT id, price FROM listings WHERE finn_id = ?", (ad.finn_id,)
+            "SELECT id, price, gone_at FROM listings WHERE finn_id = ?", (ad.finn_id,)
         ).fetchone()
         if row is None:
             brand, model, type_key = classify(
@@ -167,7 +167,13 @@ def store_ads(conn: sqlite3.Connection, search: sqlite3.Row, ads: Iterable[Parse
                     "INSERT INTO price_history (listing_id, price, seen_at) VALUES (?, ?, ?)",
                     (cursor.lastrowid, ad.price, now),
                 )
-            new += 1
+            if ad.sold:
+                conn.execute(
+                    "UPDATE listings SET gone_at = ?, gone_reason = 'solgt' WHERE id = ?",
+                    (now, cursor.lastrowid),
+                )
+            else:
+                new += 1
             continue
         known += 1
         conn.execute(
@@ -179,6 +185,13 @@ def store_ads(conn: sqlite3.Connection, search: sqlite3.Row, ads: Iterable[Parse
             (now, ad.title, ad.location, ad.location, ad.image_url, ad.image_url, published,
              row["id"]),
         )
+        if ad.sold and not row["gone_at"]:
+            conn.execute("UPDATE listings SET gone_at = ?, gone_reason = 'solgt' WHERE id = ?",
+                         (now, row["id"]))
+        elif not ad.sold and row["gone_at"]:
+            # Annonsen er tilbake på Finn (lagt ut igjen eller ny pris)
+            conn.execute("UPDATE listings SET gone_at = NULL, gone_reason = NULL WHERE id = ?",
+                         (row["id"],))
         if ad.price is not None and ad.price != row["price"]:
             conn.execute("UPDATE listings SET price = ? WHERE id = ?", (ad.price, row["id"]))
             conn.execute(
@@ -207,12 +220,51 @@ def _save_debug_copy(conn: sqlite3.Connection, html: str, label: str) -> str:
 # Én runde med sjekker
 
 
+FULL_CHECK_PAGES = 5
+LAST_PAGE_SIZE = 10  # en side med færre treff enn dette er siste side
+MAX_GONE_SHARE = 0.5  # sikkerhetssperre: aldri merk mer enn halvparten borte på én gang
+
+
+def _full_check_due(search: sqlite3.Row, hours: int, now: datetime) -> bool:
+    if hours <= 0:
+        return False
+    last = _parse(search["last_full_check_at"] or "")
+    return last is None or now - last >= timedelta(hours=hours)
+
+
+def mark_gone(conn: sqlite3.Connection, search: sqlite3.Row, seen_ids: Set[str],
+              started: str) -> int:
+    """Merker annonser fra søket som ikke lenger finnes i det, som «trolig solgt».
+
+    Kalles bare når hele søket er gjennomgått. Bare annonser som ble funnet før denne
+    gjennomgangen startet, og som ikke allerede er kjøpt eller slettet, kan merkes.
+    """
+    rows = conn.execute(
+        """SELECT id, finn_id FROM listings
+           WHERE search_id = ? AND gone_at IS NULL AND status IN ('ny', 'skjult')
+             AND first_seen_at < ?""",
+        (search["id"], started),
+    ).fetchall()
+    missing = [row["id"] for row in rows if row["finn_id"] not in seen_ids]
+    if len(missing) > 3 and len(missing) > len(rows) * MAX_GONE_SHARE:
+        log_event(conn, "advarsel",
+                  f"Søket «{search['name']}» manglet {len(missing)} av {len(rows)} annonser på én "
+                  "gang. Det ser rart ut, så ingen annonser ble merket som solgt.")
+        return 0
+    now = now_str()
+    for listing_id in missing:
+        conn.execute("UPDATE listings SET gone_at = ?, gone_reason = 'borte' WHERE id = ?",
+                     (now, listing_id))
+    return len(missing)
+
+
 def run_checks(
     conn: sqlite3.Connection,
     search_ids: Optional[Set[int]] = None,
     fetch: Callable[[str], str] = fetch_page,
     sleep: Callable[[float], None] = time.sleep,
     should_continue: Callable[[], bool] = lambda: True,
+    now: Optional[datetime] = None,
 ) -> Dict[str, int]:
     settings = get_settings(conn)
     searches: List[sqlite3.Row] = conn.execute(
@@ -222,13 +274,20 @@ def run_checks(
         searches = [s for s in searches if s["id"] in search_ids]
     pages = max(1, min(3, int(settings["pages_per_search"])))
     delay = max(3, int(settings["page_delay_s"]))
-    total_new = checked = 0
+    sold_hours = int(settings["sold_check_hours"])
+    now = now or datetime.now()
+    total_new = total_gone = checked = 0
     first_request = True
     for search in searches:
+        # Av og til blar vi gjennom hele søket for å se hvilke annonser som er borte (solgt)
+        full = _full_check_due(search, sold_hours, now)
+        started = now_str()
         found = new_here = 0
-        for page in range(1, pages + 1):
+        seen_ids: Set[str] = set()
+        complete = False
+        for page in range(1, (FULL_CHECK_PAGES if full else pages) + 1):
             if not should_continue():
-                return {"checked": checked, "new": total_new}
+                return {"checked": checked, "new": total_new, "gone": total_gone}
             if not first_request:
                 sleep(delay + random.uniform(0, 4))
             first_request = False
@@ -250,14 +309,34 @@ def run_checks(
                         "klarte ikke å lese annonsene. Den har stoppet for ikke å lagre feil data."
                         + (f" En kopi av siden er lagret i {copy}." if copy else "")
                     )
+                complete = True
                 break
+            page_ids = {ad.finn_id for ad in result.ads}
+            if page > 1 and not page_ids - seen_ids:
+                complete = True  # samme side som før: vi er forbi siste side
+                break
+            seen_ids |= page_ids
             new, known = store_ads(conn, search, result.ads)
             conn.commit()
             found += len(result.ads)
             new_here += new
-            # Treffene er sortert med nyeste først. Har vi sett noen før, er resten gamle.
-            if known > 0 or len(result.ads) < 10:
+            if (len(result.ads) < LAST_PAGE_SIZE
+                    or (result.total is not None and len(seen_ids) >= result.total)):
+                complete = True
                 break
+            # Treffene er sortert med nyeste først. Har vi sett noen før, er resten gamle.
+            if not full and known > 0:
+                break
+        if full:
+            gone = mark_gone(conn, search, seen_ids, started) if complete else 0
+            if not complete:
+                log_event(conn, "info",
+                          f"Søket «{search['name']}» har mer enn {FULL_CHECK_PAGES} sider, så "
+                          "det kan ikke sjekkes for solgte annonser. Gjør søket smalere "
+                          "(for eksempel med makspris).")
+            conn.execute("UPDATE searches SET last_full_check_at = ? WHERE id = ?",
+                         (now_str(), search["id"]))
+            total_gone += gone
         note = "" if found else (
             "Ingen treff. Hvis du vet at søket har treff på Finn, kan Finn ha endret nettsiden."
         )
@@ -269,7 +348,7 @@ def run_checks(
         conn.commit()
         total_new += new_here
         checked += 1
-    return {"checked": checked, "new": total_new}
+    return {"checked": checked, "new": total_new, "gone": total_gone}
 
 
 def stop_with_error(conn: sqlite3.Connection, message: str) -> None:
@@ -397,7 +476,9 @@ class ScraperWorker:
                 )
                 self._network_failures = 0
                 message = (
-                    f"Sjekket {summary['checked']} søk, fant {summary['new']} nye annonser."
+                    f"Sjekket {summary['checked']} søk, fant {summary['new']} nye annonser"
+                    + (f" og {summary['gone']} som er solgt eller borte."
+                       if summary.get("gone") else ".")
                 )
                 set_setting(conn, "scraper_notice", "")
                 log_event(conn, "info", message)

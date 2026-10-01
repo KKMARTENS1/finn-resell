@@ -63,7 +63,7 @@ def inject_common() -> Dict[str, Any]:
     conn = get_db()
     settings = get_settings(conn)
     nav_new = conn.execute(
-        "SELECT COUNT(*) FROM listings WHERE status = 'ny' AND first_seen_at > ?",
+        "SELECT COUNT(*) FROM listings WHERE status = 'ny' AND gone_at IS NULL AND first_seen_at > ?",
         (settings["last_seen_finds_at"] or "0000",),
     ).fetchone()[0]
     return {
@@ -79,6 +79,8 @@ def inject_common() -> Dict[str, Any]:
         "VERDICTS": VERDICTS,
         "rule_text": rule_text(settings),
         "url_with": url_with,
+        "days_between": stats.days_between,
+        "LISTING_TABS": list(LISTING_STATUSES.items()),
         "app_version": current_app.config.get("VERSION", "0"),
         "update_version": (settings["update_available"]
                            if updater.is_newer(settings["update_available"],
@@ -221,7 +223,8 @@ def oversikt():
     settings = get_settings(conn)
     data = stats.dashboard(conn, settings)
     rows = conn.execute(
-        "SELECT * FROM listings WHERE status = 'ny' ORDER BY first_seen_at DESC, id DESC LIMIT 200"
+        "SELECT * FROM listings WHERE status = 'ny' AND gone_at IS NULL "
+        "ORDER BY first_seen_at DESC, id DESC LIMIT 200"
     ).fetchall()
     prices = PriceData(conn, settings)
     best = []
@@ -270,6 +273,15 @@ def sort_cards(cards: List[Dict[str, Any]], sort_key: str) -> List[Dict[str, Any
     return cards
 
 
+def view_condition(view: str) -> Tuple[str, List[Any]]:
+    """SQL-vilkår for fanene i Nye funn. Solgte annonser vises bare under «Solgt / borte»."""
+    if view == "borte":
+        return "l.gone_at IS NOT NULL AND l.status IN ('ny', 'skjult')", []
+    if view == "kjopt":
+        return "l.status = 'kjopt'", []
+    return "l.status = ? AND l.gone_at IS NULL", [view]
+
+
 def filtered_finds(conn: sqlite3.Connection, args: Any) -> Dict[str, Any]:
     """Annonsene som passer til valgene på Nye funn (fane, farge, søk, type, merke)."""
     settings = get_settings(conn)
@@ -282,9 +294,9 @@ def filtered_finds(conn: sqlite3.Connection, args: Any) -> Dict[str, Any]:
     if sort_key not in dict(FIND_SORTS):
         sort_key = "nyeste"
 
-    query = """SELECT l.*, s.name AS search_name FROM listings l
-               LEFT JOIN searches s ON s.id = l.search_id WHERE l.status = ?"""
-    params: List[Any] = [view]
+    condition, params = view_condition(view)
+    query = f"""SELECT l.*, s.name AS search_name FROM listings l
+                LEFT JOIN searches s ON s.id = l.search_id WHERE {condition}"""
     if search_filter:
         query += " AND l.search_id = ?"
         params.append(search_filter)
@@ -331,10 +343,11 @@ def funn():
         set_setting(conn, "last_seen_finds_at", now_str())
         conn.commit()
     searches = conn.execute("SELECT id, name FROM searches ORDER BY name").fetchall()
-    tab_counts = {
-        key: conn.execute("SELECT COUNT(*) FROM listings WHERE status = ?", (key,)).fetchone()[0]
-        for key in LISTING_STATUSES
-    }
+    tab_counts = {}
+    for key in LISTING_STATUSES:
+        condition, params = view_condition(key)
+        tab_counts[key] = conn.execute(
+            f"SELECT COUNT(*) FROM listings l WHERE {condition}", params).fetchone()[0]
     return render_template(
         "funn.html",
         cards=cards,
@@ -364,7 +377,7 @@ def funn_rydd():
     ids = [card["listing"]["id"] for card in found["cards"]]
     if action == "skjul" and found["view"] == "ny":
         new_status, verb = "skjult", "skjult"
-    elif action == "slett" and found["view"] == "skjult":
+    elif action == "slett" and found["view"] in ("skjult", "borte"):
         new_status, verb = "slettet", "slettet"
     else:
         abort(400)
@@ -1004,7 +1017,7 @@ def api_status():
     conn = get_db()
     settings = get_settings(conn)
     nav_new = conn.execute(
-        "SELECT COUNT(*) FROM listings WHERE status = 'ny' AND first_seen_at > ?",
+        "SELECT COUNT(*) FROM listings WHERE status = 'ny' AND gone_at IS NULL AND first_seen_at > ?",
         (settings["last_seen_finds_at"] or "0000",),
     ).fetchone()[0]
     return jsonify(
@@ -1025,7 +1038,7 @@ SETTING_FIELDS = [
     "min_profit_pct", "min_profit_kr", "sale_factor_pct", "default_extra_cost",
     "cond_value_5", "cond_value_4", "cond_value_2", "cond_value_1",
     "min_comparables", "market_months", "budget_kr", "auto_hide_days", "auto_delete_days",
-    "scrape_interval_min", "page_delay_s", "pages_per_search",
+    "scrape_interval_min", "page_delay_s", "pages_per_search", "sold_check_hours",
 ]
 
 

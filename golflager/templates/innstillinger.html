@@ -79,6 +79,7 @@
         {{ number_field('page_delay_s', 'Pause mellom sider', 'sek', 'Pluss 0–4 tilfeldige sekunder') }}
         {{ number_field('pages_per_search', 'Sider per søk', 'stk', 'Oftest holder 1. Maks 3.') }}
       </div>
+      {{ number_field('sold_check_hours', 'Se etter solgte annonser hver', 'time', 'Da blar scraperen gjennom alle sidene i hvert søk (maks 5) for å se hvilke annonser som er borte. 0 = av.') }}
     </section>
 
     <div class="form-actions">

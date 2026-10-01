@@ -397,6 +397,8 @@ details.table-view table { margin-top: 10px; }
 .flag--gronn .flag__cloth { fill: var(--go); }
 .flag--gul .flag__cloth { fill: var(--maybe); }
 .flag--rod .flag__cloth { fill: var(--stop); }
+.flag--solgt { background: var(--surface-2); color: var(--ink-2); }
+.flag--solgt .flag__cloth { fill: var(--muted); }
 .flag__pole { stroke: currentColor; }
 
 /* ---------- Nye funn ---------- */
@@ -411,6 +413,8 @@ details.table-view table { margin-top: 10px; }
 .find--gronn::before { background: var(--go); }
 .find--gul::before { background: var(--maybe); }
 .find--rod::before { background: var(--stop); }
+.find--solgt::before { background: var(--muted); }
+.find--solgt .find__img img { filter: grayscale(.6); opacity: .85; }
 .find__img { display: block; aspect-ratio: 4 / 3; background: var(--surface-2); position: relative; overflow: hidden; }
 .find__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .find__img .placeholder { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
